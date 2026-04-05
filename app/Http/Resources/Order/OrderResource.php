@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Http\Resources\Order;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class OrderResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'uuid' => $this->uuid,
+            'order_number' => $this->order_number,
+            'user_id' => $this->user_id,
+            'session_id' => $this->session_id,
+            'status' => $this->status->value,
+            'status_label' => $this->status->label(),
+            'status_color' => $this->status->color(),
+            'payment_status' => $this->payment_status->value,
+            'payment_status_label' => $this->payment_status->label(),
+            'payment_status_color' => $this->payment_status->color(),
+            'subtotal' => (float) $this->subtotal,
+            'shipping_cost' => (float) $this->shipping_cost,
+            'tax_amount' => (float) $this->tax_amount,
+            'discount_amount' => (float) $this->discount_amount,
+            'total_amount' => (float) $this->total_amount,
+            'formatted_total' => $this->formatted_total,
+            'currency' => $this->currency,
+            'total_items' => $this->total_items,
+            'shipping' => [
+                'name' => $this->shipping_name,
+                'address' => $this->shipping_address,
+                'city' => $this->shipping_city,
+                'state' => $this->shipping_state,
+                'postal_code' => $this->shipping_postal_code,
+                'country' => $this->shipping_country,
+                'phone' => $this->shipping_phone,
+                'whatsapp' => $this->shipping_whatsapp,
+            ],
+            'billing' => [
+                'name' => $this->billing_name,
+                'email' => $this->billing_email,
+            ],
+            'notes' => $this->notes,
+            'can_be_cancelled' => $this->canBeCancelled(),
+            'is_pending' => $this->isPending(),
+            'is_delivered' => $this->isDelivered(),
+            'is_cancelled' => $this->isCancelled(),
+            'confirmed_at' => $this->confirmed_at?->toIso8601String(),
+            'shipped_at' => $this->shipped_at?->toIso8601String(),
+            'delivered_at' => $this->delivered_at?->toIso8601String(),
+            'cancelled_at' => $this->cancelled_at?->toIso8601String(),
+            'cancellation_reason' => $this->cancellation_reason,
+            'items' => OrderItemResource::collection($this->whenLoaded('items')),
+            'status_history' => OrderStatusHistoryResource::collection($this->whenLoaded('statusHistory')),
+            'created_at' => $this->created_at->toIso8601String(),
+            'updated_at' => $this->updated_at->toIso8601String(),
+        ];
+    }
+}
