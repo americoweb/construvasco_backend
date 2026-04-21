@@ -29,6 +29,8 @@ require_once __DIR__ . '/checkout.php';
 require_once __DIR__ . '/order.php';
 require_once __DIR__ . '/payment.php';
 require_once __DIR__ . '/ai.php';
+require_once __DIR__ . '/admin.php';
+require_once __DIR__ . '/job_card.php';
 
 // Optional: Include candidate routes if needed (for future features)
 // require_once __DIR__ . '/candidate.php';

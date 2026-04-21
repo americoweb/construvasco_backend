@@ -42,4 +42,3 @@ class FormSubmission extends Model
         return $this->submission_type === 'submit';
     }
 }
-Made with

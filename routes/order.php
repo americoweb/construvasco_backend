@@ -42,6 +42,9 @@ Route::prefix('v1')->group(function () {
 
     // Admin order routes
     Route::prefix('admin/orders')->group(function () {
+        // Create order (manager / back-office — requires authentication)
+        Route::post('/', [OrderController::class, 'store'])->middleware('auth:api');
+
         // List all orders
         Route::get('/', [OrderController::class, 'index']);
         

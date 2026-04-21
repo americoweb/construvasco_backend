@@ -41,4 +41,18 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
     ],
 
+    'google_drive' => [
+        // OAuth2 client secrets file (downloaded from Google Cloud Console)
+        // stored at: storage/app/google-oauth-client.json
+        // Token auto-saved to: storage/app/google-token.json after running drive:authorize
+        'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID', null),
+    ],
+
+    'whatsapp' => [
+        'url'           => env('WHATSAPP_API_URL', 'https://hdxqelinqivwgmggolhs.supabase.co/functions/v1/api-gateway'),
+        'api_key'       => env('WHATSAPP_API_KEY', ''),
+        'bearer_token'  => env('WHATSAPP_BEARER_TOKEN', ''),
+        'instance_name' => env('WHATSAPP_INSTANCE_NAME', ''),
+    ],
+
 ];

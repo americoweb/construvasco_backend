@@ -17,6 +17,8 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/app/google-oauth-client.json
+/storage/app/google-token.json
 /storage/pail
 /vendor
 Homestead.json

@@ -31,6 +31,8 @@ use App\Repositories\Order\Contracts\OrderRepositoryInterface;
 use App\Repositories\Order\Contracts\OrderItemRepositoryInterface;
 use App\Repositories\Order\Eloquent\EloquentOrderRepository;
 use App\Repositories\Order\Eloquent\EloquentOrderItemRepository;
+use App\Repositories\JobCard\Contracts\JobCardRepositoryInterface;
+use App\Repositories\JobCard\Eloquent\EloquentJobCardRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -61,6 +63,9 @@ class AppServiceProvider extends ServiceProvider
         // Register Order repositories
         $this->app->bind(OrderRepositoryInterface::class, EloquentOrderRepository::class);
         $this->app->bind(OrderItemRepositoryInterface::class, EloquentOrderItemRepository::class);
+
+        // Register JobCard repositories
+        $this->app->bind(JobCardRepositoryInterface::class, EloquentJobCardRepository::class);
         
         // Register AI resume parser
         $this->app->bind(\App\Contracts\AI\ResumeParserInterface::class, \App\Services\AI\DefaultResumeParser::class);
