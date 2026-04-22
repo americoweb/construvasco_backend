@@ -166,4 +166,9 @@ class Order extends Model
         
         $this->total_amount = $this->subtotal + $this->shipping_cost + $this->tax_amount - $this->discount_amount;
     }
+
+    public function jobCard(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Models\JobCard\JobCard::class, 'order_id');
+    }
 }

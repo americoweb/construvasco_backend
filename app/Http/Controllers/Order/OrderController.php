@@ -63,7 +63,7 @@ class OrderController extends Controller
     public function showByOrderNumber(string $orderNumber): JsonResponse
     {
         $order = $this->orderService->findByOrderNumber($orderNumber);
-        $order->load(['items', 'statusHistory']);
+        $order->load(['items', 'statusHistory', 'jobCard']);
 
         return response()->json([
             'data' => new OrderResource($order)
@@ -73,7 +73,7 @@ class OrderController extends Controller
     public function showByUuid(string $uuid): JsonResponse
     {
         $order = $this->orderService->findByUuid($uuid);
-        $order->load(['items', 'statusHistory']);
+        $order->load(['items', 'statusHistory', 'jobCard']);
 
         return response()->json([
             'data' => new OrderResource($order)

@@ -72,7 +72,7 @@ class EloquentOrderRepository implements OrderRepositoryInterface
 
     public function getWithItems(int $id): ?Order
     {
-        return $this->model->with(['items', 'statusHistory'])->find($id);
+        return $this->model->with(['items', 'statusHistory', 'jobCard'])->find($id);
     }
 
     public function getPending(): Collection
@@ -93,7 +93,7 @@ class EloquentOrderRepository implements OrderRepositoryInterface
 
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = $this->model->with('items');
+        $query = $this->model->with(['items', 'jobCard']);
         
         $this->applyFilters($query, $filters);
         

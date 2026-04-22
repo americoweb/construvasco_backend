@@ -192,7 +192,10 @@ class OrderService
 
     public function confirmOrder(int $id): Order
     {
-        return $this->updateStatus($id, OrderStatus::CONFIRMED, 'Pedido confirmado');
+        $order = $this->updateStatus($id, OrderStatus::CONFIRMED, 'Pedido confirmado');
+        $this->bridgeToJobCard($order);
+        
+        return $order->fresh(['items', 'statusHistory', 'jobCard']);
     }
 
     public function markInProduction(int $id): Order
@@ -312,5 +315,63 @@ class OrderService
                 'ip_address' => request()->ip(),
             ],
         ]);
+    }
+
+    protected function bridgeToJobCard(Order $order): void
+    {
+        // Prevent duplicate job cards for same order
+        if ($order->jobCard()->exists()) {
+            return;
+        }
+
+        $clientId = $order->user_id;
+
+        // Guest fallback logic
+        if (!$clientId) {
+            $identifier = $order->billing_email ?? $order->shipping_whatsapp ?? 'guest_' . uniqid() . '@amazing.co.mz';
+            $guestUser = \App\Models\User::firstOrCreate(
+                ['identifier' => $identifier],
+                [
+                    'name' => $order->billing_name ?? $order->shipping_name ?? 'Guest Client',
+                    'password' => bcrypt(\Illuminate\Support\Str::random(16)),
+                    'type' => 'client',
+                    'is_active' => true,
+                ]
+            );
+            $clientId = $guestUser->id;
+
+            $this->orderRepository->update($order->id, ['user_id' => $clientId]);
+            $order->user_id = $clientId;
+        }
+
+        $items = [];
+        $order->loadMissing('items');
+        foreach ($order->items as $item) {
+            $notes = [];
+            if ($item->print_area_name) $notes[] = "Área: {$item->print_area_name}";
+            if ($item->design_prompt) $notes[] = "Prompt: {$item->design_prompt}";
+            if ($item->notes) $notes[] = "Notas: {$item->notes}";
+
+            $items[] = [
+                'product_id' => $item->product_id,
+                'product_color_id' => $item->product_color_id,
+                'product_type' => $item->product_name,
+                'quantity' => $item->quantity,
+                'material' => $item->color_name,
+                'notes' => implode(' | ', $notes),
+            ];
+        }
+
+        $jobCardService = app(\App\Services\JobCard\JobCardService::class);
+        $jobCardService->create([
+            'client_id' => $clientId,
+            'created_by' => $clientId, 
+            'title' => "Pedido Online #{$order->order_number}",
+            'description' => $order->notes ?? 'Gerado automaticamente a partir do pedido online.',
+            'status' => \App\Enums\JobCard\JobCardStatus::BRIEFING,
+            'deadline' => now()->addDays(7),
+            'order_id' => $order->id,
+            'priority' => \App\Enums\JobCard\JobCardPriority::MEDIUM,
+        ], $items);
     }
 }
