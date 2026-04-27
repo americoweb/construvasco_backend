@@ -118,8 +118,7 @@ class EloquentJobCardRepository implements JobCardRepositoryInterface
 
         $this->applyFilters($query, $filters);
 
-        return $query->orderByDesc('priority_score')
-                     ->orderBy('deadline')
+        return $query->orderByDesc('created_at')
                      ->paginate($perPage);
     }
 

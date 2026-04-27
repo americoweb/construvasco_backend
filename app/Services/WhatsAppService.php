@@ -35,13 +35,20 @@ class WhatsAppService
         }
 
         // Normalise number: strip leading + or spaces
-        $to = preg_replace('/[^0-9]/', '', $to);
+        $normalizedTo = preg_replace('/[^0-9]/', '', $to);
+
+        if (empty($normalizedTo)) {
+            Log::warning('WhatsAppService: Invalid phone number (empty after filtering). Skipping send.', [
+                'original_to' => $to,
+            ]);
+            return false;
+        }
 
         $payload = [
             'action'        => 'send',
             'instance_name' => $this->instanceName,
-            'to'            => $to,
-            'message'       => $message,
+            'number'        => $normalizedTo,
+            'text'          => $message,
         ];
 
         $endpoint = "{$this->baseUrl}/whatsapp/send";
@@ -50,8 +57,6 @@ class WhatsAppService
             'endpoint' => $endpoint,
             'payload'  => $payload,
         ]);
-        echo "\n[WhatsApp] POST {$endpoint}\n";
-        echo "[WhatsApp] Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
 
         try {
             $headers = [
@@ -93,9 +98,6 @@ class WhatsAppService
             $status = $response->status();
             $body   = $response->body();
 
-            echo "[WhatsApp] Response status: {$status}\n";
-            echo "[WhatsApp] Response body: {$body}\n";
-
             if ($response->successful()) {
                 Log::info('[WhatsApp] Message sent successfully', [
                     'to'     => $to,
@@ -119,7 +121,6 @@ class WhatsAppService
             }
             return false;
         } catch (\Throwable $e) {
-            echo "[WhatsApp] Exception: " . $e->getMessage() . "\n";
             Log::error('[WhatsApp] HTTP error: ' . $e->getMessage(), compact('to'));
             return false;
         }

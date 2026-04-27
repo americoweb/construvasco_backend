@@ -181,7 +181,9 @@ class JobCardDesignController extends Controller
             abort(404, 'Ficheiro não encontrado ou não é uma imagem.');
         }
 
-        $diskPath = Storage::disk('public')->path($file->disk_path);
+        // Use the file's own disk (falls back to 'local' for legacy records)
+        $disk     = $file->disk ?? 'local';
+        $diskPath = Storage::disk($disk)->path($file->disk_path);
         if (!file_exists($diskPath)) {
             abort(404, 'Ficheiro não encontrado no disco.');
         }
@@ -202,9 +204,11 @@ class JobCardDesignController extends Controller
 
     private function fileToBase64(JobCardFile $file): array
     {
-        $path = Storage::disk('public')->path($file->disk_path);
+        // Use the file's own disk (falls back to 'local' for legacy records without a disk value)
+        $disk = $file->disk ?? 'local';
+        $path = Storage::disk($disk)->path($file->disk_path);
         if (!file_exists($path)) {
-            throw new \RuntimeException("File not found on disk: {$file->disk_path}");
+            throw new \RuntimeException("File not found on disk ({$disk}): {$file->disk_path}");
         }
         return [base64_encode(file_get_contents($path)), $file->mime_type ?? 'image/png'];
     }

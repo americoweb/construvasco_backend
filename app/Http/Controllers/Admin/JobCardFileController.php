@@ -10,6 +10,7 @@ use App\Models\JobCard\JobCard;
 use App\Models\JobCard\JobCardFile;
 use App\Services\GoogleDriveService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 
 class JobCardFileController extends Controller
@@ -27,7 +28,8 @@ class JobCardFileController extends Controller
 
     /**
      * POST /admin/job-cards/{id}/files
-     * 1. Store file locally (disk=local, disk=public, etc.)
+     * 1. Store file on the public disk (storage/app/public/) so it can be served via the symlink
+     *    OR served through the authenticated serve endpoint.
      * 2. Create DB record
      * 3. Dispatch queue job to mirror to Drive
      */
@@ -36,7 +38,7 @@ class JobCardFileController extends Controller
         $jobCard = JobCard::findOrFail($id);
 
         $uploadedFile = $request->file('file');
-        $disk         = 'local'; // or 's3', configurable
+        $disk         = 'local'; // keep private; serve via authenticated endpoint
         $folder       = "job-cards/{$jobCard->id}/files";
         $diskPath     = $uploadedFile->store($folder, $disk);
 
@@ -48,7 +50,7 @@ class JobCardFileController extends Controller
             'uploaded_by' => $request->user()->id,
             'type'        => $request->type,
             'file_name'   => $uploadedFile->getClientOriginalName(),
-            'file_url'    => Storage::disk($disk)->url($diskPath),
+            'file_url'    => null, // no longer used; resource generates the serve URL
             'mime_type'   => $uploadedFile->getMimeType(),
             'file_size'   => $uploadedFile->getSize(),
             'version'     => $version,
@@ -62,6 +64,31 @@ class JobCardFileController extends Controller
 
         $file->load('uploader');
         return response()->json(['data' => new JobCardFileResource($file)], 201);
+    }
+
+    /**
+     * GET /admin/job-cards/{id}/files/{fileId}/serve
+     * Stream the physical file from whichever disk it lives on (authenticated).
+     */
+    public function serve(int $id, int $fileId): Response
+    {
+        $file = JobCardFile::where('job_card_id', $id)->findOrFail($fileId);
+
+        $disk = $file->disk ?? 'local';
+
+        if (!$file->disk_path || !Storage::disk($disk)->exists($file->disk_path)) {
+            abort(404, 'File not found on disk.');
+        }
+
+        $contents = Storage::disk($disk)->get($file->disk_path);
+        $mime     = $file->mime_type ?? 'application/octet-stream';
+
+        return response($contents, 200, [
+            'Content-Type'        => $mime,
+            'Content-Disposition' => 'inline; filename="' . $file->file_name . '"',
+            'Cache-Control'       => 'private, max-age=3600',
+            'Content-Length'      => strlen($contents),
+        ]);
     }
 
     /**
@@ -79,7 +106,7 @@ class JobCardFileController extends Controller
 
         // Remove from local disk
         if ($file->disk_path) {
-            Storage::disk($file->disk)->delete($file->disk_path);
+            Storage::disk($file->disk ?? 'local')->delete($file->disk_path);
         }
 
         $file->delete();

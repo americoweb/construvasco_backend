@@ -24,8 +24,11 @@ class ActivityLogService
 
         $activity = activity($logName)
             ->by($causer ?? auth('api')->user())
-            ->on($subject)
             ->withProperties($properties);
+
+        if ($subject) {
+            $activity->on($subject);
+        }
 
         return $activity->log($description);
     }

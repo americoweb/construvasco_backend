@@ -301,6 +301,125 @@ class TenantController extends Controller
         ]);
     }
 
+    public function roles()
+    {
+        // Simple static roles map for Amazing app
+        $roles = [
+            [
+                'name' => 'owner',
+                'label' => 'Proprietário da Organização',
+                'description' => 'Acesso total a todas as configurações e funcionalidades'
+            ],
+            [
+                'name' => 'admin',
+                'label' => 'Administrador',
+                'description' => 'Gestão de todas as operações e configurações vitais'
+            ],
+            [
+                'name' => 'receptionist',
+                'label' => 'Recepcionista',
+                'description' => 'Atendimento, criação de pedidos e job cards'
+            ],
+            [
+                'name' => 'designer',
+                'label' => 'Designer',
+                'description' => 'Acesso ao Kanban e gestão visual de designs'
+            ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $roles
+        ]);
+    }
+
+    public function updateUserRole(Request $request, $userId)
+    {
+        $request->validate(['role' => 'required|string']);
+        
+        $user = $request->user();
+        $tenant = $user->getCurrentTenant();
+        
+        if (!$tenant || !$user->hasTenantPermission('users.manage_roles')) {
+            return response()->json(['error' => 'Insufficient permissions or no tenant'], 403);
+        }
+
+        $targetUser = \App\Models\User::findOrFail($userId);
+        $role = $request->input('role');
+
+        try {
+            app(\App\Services\TenantService::class)->addUserToTenant(
+                $tenant,
+                $targetUser,
+                $role,
+                $role === 'owner',
+                []
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Role updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to update role',
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
+    public function removeUser(Request $request, $userId)
+    {
+        $user = $request->user();
+        $tenant = $user->getCurrentTenant();
+        
+        if (!$tenant || !$user->hasTenantPermission('users.manage_roles')) {
+            return response()->json(['error' => 'Insufficient permissions'], 403);
+        }
+
+        $targetUser = \App\Models\User::findOrFail($userId);
+
+        try {
+            app(\App\Services\TenantService::class)->removeUserFromTenant($tenant, $targetUser);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User removed from tenant'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to remove user',
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
+    public function resendInvitation(Request $request, $invitationId)
+    {
+        $user = $request->user();
+        $tenant = $user->getCurrentTenant();
+        $invitation = \App\Models\TenantInvitation::where('id', $invitationId)
+            ->where('tenant_id', $tenant->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$invitation) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invitation not found'
+            ], 404);
+        }
+
+        $this->notificationService->sendInvitation($invitation, $tenant, $user);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Invitation resent successfully'
+        ]);
+    }
+
     /**
      * Detect if the identifier is an email or WhatsApp number
      */

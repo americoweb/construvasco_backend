@@ -39,9 +39,10 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
     Route::post('admin/job-cards/{id}/link-order', [JobCardController::class, 'linkOrder']);
 
     // File management
-    Route::get('admin/job-cards/{id}/files',             [JobCardFileController::class, 'index']);
-    Route::post('admin/job-cards/{id}/files',            [JobCardFileController::class, 'store']);
-    Route::delete('admin/job-cards/{id}/files/{fileId}', [JobCardFileController::class, 'destroy']);
+    Route::get('admin/job-cards/{id}/files',                   [JobCardFileController::class, 'index']);
+    Route::post('admin/job-cards/{id}/files',                  [JobCardFileController::class, 'store']);
+    Route::get('admin/job-cards/{id}/files/{fileId}/serve',    [JobCardFileController::class, 'serve']);
+    Route::delete('admin/job-cards/{id}/files/{fileId}',       [JobCardFileController::class, 'destroy']);
 
     // Design workspace
     Route::post('admin/job-cards/{id}/design/generate',   [JobCardDesignController::class, 'generate']);

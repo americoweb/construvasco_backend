@@ -9,12 +9,17 @@ class JobCardFileResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Generate a serve URL through our authenticated endpoint.
+        // This works for files on ANY disk (local/private, public, s3).
+        // Format: {API_BASE}/v1/admin/job-cards/{job_card_id}/files/{id}/serve
+        $serveUrl = url("api/v1/admin/job-cards/{$this->job_card_id}/files/{$this->id}/serve");
+
         return [
             'id'                   => $this->id,
             'type'                 => $this->type->value,
             'type_label'           => $this->type->label(),
             'file_name'            => $this->file_name,
-            'file_url'             => $this->file_url,
+            'file_url'             => $serveUrl,
             'mime_type'            => $this->mime_type,
             'file_size'            => $this->file_size,
             'version'              => $this->version,

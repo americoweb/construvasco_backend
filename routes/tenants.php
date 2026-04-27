@@ -21,9 +21,15 @@ Route::prefix('tenants')->middleware('auth:api')->group(function () {
     // Tenant users management
     Route::get('users', [TenantController::class, 'users']);
     Route::post('users', [TenantController::class, 'addUser']);
+    Route::put('users/{userId}/role', [TenantController::class, 'updateUserRole']);
+    Route::delete('users/{userId}', [TenantController::class, 'removeUser']);
+    
+    // Roles map
+    Route::get('roles', [TenantController::class, 'roles']);
     
     // Tenant invitations
     Route::get('invitations', [TenantController::class, 'invitations']);
     Route::delete('invitations/{invitationId}', [TenantController::class, 'cancelInvitation']);
+    Route::post('invitations/{invitationId}/resend', [TenantController::class, 'resendInvitation']);
 });
 
