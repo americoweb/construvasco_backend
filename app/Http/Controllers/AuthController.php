@@ -290,7 +290,8 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'identifier' => 'required|string',
+            'identifier' => 'nullable|string',
+            'email' => 'nullable|string',
             'password' => 'required|string',
         ]);
 
@@ -306,18 +307,27 @@ class AuthController extends Controller
 
         $credentials = $validator->validated();
 
-        // Find user by identifier
-        $user = User::where('identifier', $credentials['identifier'])->first();
+        $raw = $credentials['identifier'] ?? $request->input('email', '');
+        $identifier = strtolower(trim((string) $raw));
+
+        if ($identifier === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email or identifier is required.',
+                'message_pt' => 'Indique o email ou identificador.',
+                'error_code' => 'VALIDATION_ERROR',
+            ], 422);
+        }
+
+        // Find user by identifier (case-insensitive; allow legacy clients that send "email")
+        $user = User::whereRaw('LOWER(identifier) = ?', [$identifier])->first();
         if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password.',
                 'message_pt' => 'Email ou palavra-passe invalidos.',
                 'error_code' => 'INVALID_IDENTIFIER',
-                'action' => 'Click here to reset your password',
-                'action_pt' => 'Clique aqui para redefinir a sua palavra-passe',
-                'redirect' => '/auth/forgot-password'
-            ], 403);
+            ], 422);
         }
 
         // Check if user is active
@@ -331,16 +341,13 @@ class AuthController extends Controller
         }
 
         // Check password
-        if (! Hash::check($credentials['password'], $user->password)) {
+        if (! Hash::check((string) $request->get('password'), $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password.',
                 'message_pt' => 'Email ou palavra-passe invalidos.',
                 'error_code' => 'INVALID_PASSWORD',
-                'action' => 'Click here to reset your password',
-                'action_pt' => 'Clique aqui para redefinir a sua palavra-passe',
-                'redirect' => '/auth/forgot-password'
-            ], 403);
+            ], 422);
         }
 
         // Attempt login and get token

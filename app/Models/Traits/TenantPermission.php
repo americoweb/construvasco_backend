@@ -203,9 +203,31 @@ trait TenantPermission
     private function getCurrentTenantId(): ?int
     {
         logger()->debug('TenantPermission::getCurrentTenantId called');
-        return session('tenant_id') ?? 
-               cache()->get('tenant_id_' . $this->id) ?? 
-               null;
+        if ($sid = session('tenant_id')) {
+            return (int) $sid;
+        }
+        if ($cid = cache()->get('tenant_id_' . $this->id)) {
+            return (int) $cid;
+        }
+
+        // JWT / SPA: session often empty on subsequent requests; resolve from pivot.
+        $fromPivot = DB::table('tenant_users')
+            ->where('user_id', $this->id)
+            ->where('status', 'active')
+            ->where('current_tenant', true)
+            ->value('tenant_id');
+
+        if ($fromPivot) {
+            return (int) $fromPivot;
+        }
+
+        $fallback = DB::table('tenant_users')
+            ->where('user_id', $this->id)
+            ->where('status', 'active')
+            ->orderByDesc('current_tenant')
+            ->value('tenant_id');
+
+        return $fallback ? (int) $fallback : null;
     }
     
     public function getTenantUserPivot($tenantId)

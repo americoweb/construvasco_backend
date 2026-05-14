@@ -22,15 +22,17 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/user.php';
 require_once __DIR__ . '/tenants.php';
 require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/payment.php';
+require_once __DIR__ . '/ai.php';
+require_once __DIR__ . '/admin.php';
+// Transitional commercial flow kept for Construvasco
 require_once __DIR__ . '/product.php';
 require_once __DIR__ . '/design.php';
 require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/checkout.php';
 require_once __DIR__ . '/order.php';
-require_once __DIR__ . '/payment.php';
-require_once __DIR__ . '/ai.php';
-require_once __DIR__ . '/admin.php';
 require_once __DIR__ . '/job_card.php';
+require_once __DIR__ . '/construction.php';
 
 // Optional: Include candidate routes if needed (for future features)
 // require_once __DIR__ . '/candidate.php';

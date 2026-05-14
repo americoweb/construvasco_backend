@@ -62,7 +62,13 @@ Route::prefix('v1')->group(function () {
         
         // Quick status updates
         Route::post('/{id}/confirm', [OrderController::class, 'confirm']);
+        Route::post('/{id}/triage', [OrderController::class, 'triage']);
+        Route::post('/{id}/assign', [OrderController::class, 'assign']);
         Route::post('/{id}/in-production', [OrderController::class, 'markInProduction']);
+        Route::post('/{id}/in-design', [OrderController::class, 'markInDesign']);
+        Route::post('/{id}/awaiting-client', [OrderController::class, 'markAwaitingClient']);
+        Route::post('/{id}/approve', [OrderController::class, 'approve']);
+        Route::post('/{id}/in-execution', [OrderController::class, 'markInExecution']);
         Route::post('/{id}/ship', [OrderController::class, 'markShipped']);
         Route::post('/{id}/deliver', [OrderController::class, 'markDelivered']);
         Route::post('/{id}/paid', [OrderController::class, 'markAsPaid']);

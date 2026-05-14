@@ -104,6 +104,66 @@ class SuggestionController extends Controller
         }
     }
 
+    public function generateHouse(GenerateMockupRequest $request): JsonResponse
+    {
+        try {
+            $validated = $request->validated();
+            $generationId = (string) \Illuminate\Support\Str::uuid();
+
+            $housePath = $this->suggestionService->generateHouseRender(
+                $request->product_id,
+                $validated
+            );
+
+            $baseUrl = $request->getSchemeAndHttpHost();
+            $houseImageUrl = rtrim($baseUrl, '/') . '/storage/' . ltrim($housePath, '/');
+
+            return response()->json([
+                'data' => [
+                    'generation_id' => $generationId,
+                    'house_image_url' => $houseImageUrl,
+                ],
+                'message' => 'Render da casa gerado com sucesso!'
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Falha ao gerar imagem da casa',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    public function generateFloorPlan(GenerateMockupRequest $request): JsonResponse
+    {
+        try {
+            $validated = $request->validated();
+            $generationId = $request->input('generation_id') ?: (string) \Illuminate\Support\Str::uuid();
+
+            $houseImageUrl = (string) $request->input('house_image_url', '');
+            $floorPlanPath = $this->suggestionService->generateFloorPlan(
+                $request->product_id,
+                $validated,
+                $houseImageUrl
+            );
+
+            $baseUrl = $request->getSchemeAndHttpHost();
+            $floorPlanImageUrl = rtrim($baseUrl, '/') . '/storage/' . ltrim($floorPlanPath, '/');
+
+            return response()->json([
+                'data' => [
+                    'generation_id' => $generationId,
+                    'floorplan_image_url' => $floorPlanImageUrl,
+                ],
+                'message' => 'Planta gerada com sucesso!'
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Falha ao gerar planta',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
     /**
      * Refine Design
      * 

@@ -12,13 +12,29 @@ class Project extends Model
     use SoftDeletes, LogsActivityWithTenant, Tenantable; // Tenantable LAST!
 
     protected $fillable = [
-        'tenant_id', 'name', 'description', 'status', 'start_date', 'end_date', 'budget',
+        'tenant_id',
+        'client_user_id',
+        'service_category_id',
+        'construction_service_id',
+        'name',
+        'description',
+        'status',
+        'project_type',
+        'location',
+        'start_date',
+        'end_date',
+        'desired_deadline',
+        'budget',
+        'target_budget',
+        'current_phase',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'desired_deadline' => 'date',
         'budget' => 'decimal:2',
+        'target_budget' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

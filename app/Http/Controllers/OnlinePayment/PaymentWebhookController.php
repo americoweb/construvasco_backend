@@ -46,20 +46,14 @@ class PaymentWebhookController extends Controller
 
             $webhookData = $request->all();
 
-            // Process the webhook
-            $success = $this->paymentService->handlePaymentWebhook($webhookData);
+            // Hard-cut phase: legacy order webhook processing is disabled.
+            // The new project payment workflow is handled by the construction domain.
+            $this->paymentService->handlePaymentWebhook($webhookData);
 
-            if ($success) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Webhook processed successfully'
-                ], 200);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to process webhook'
-                ], 400);
-            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Webhook accepted'
+            ], 202);
 
         } catch (\Exception $e) {
             Log::error('Payment webhook exception', [

@@ -6,6 +6,17 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * Seed default users (Construvasco demo).
+ *
+ * Login (API auth/login, field "identifier"):
+ *  - admin@construvasco.co.mz / 12345678
+ *  - gestor@construvasco.co.mz / 12345678
+ *  - cliente@construvasco.co.mz / 12345678
+ *
+ * After changing users, run full seed or at least TenantUserSeeder so tenant_users
+ * rows exist (otherwise roles/context after login may be empty).
+ */
 class UserSeeder extends Seeder
 {
     /**
@@ -15,8 +26,8 @@ class UserSeeder extends Seeder
     {
         $users = [
             [
-                'name' => 'Admin User',
-                'identifier' => 'admin@admin.com',
+                'name' => 'Administrador Construvasco',
+                'identifier' => 'admin@construvasco.co.mz',
                 'type' => 'email',
                 'password' => Hash::make('12345678'),
                 'verified_at' => now(),
@@ -24,72 +35,33 @@ class UserSeeder extends Seeder
                 'settings' => json_encode(['theme' => 'dark', 'notifications' => true])
             ],
             [
-                'name' => 'John Doe',
-                'identifier' => 'john.doe@acme.com',
+                'name' => 'Gestor de Projectos',
+                'identifier' => 'gestor@construvasco.co.mz',
                 'type' => 'email',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make('12345678'),
                 'verified_at' => now(),
                 'is_active' => true,
                 'settings' => json_encode(['theme' => 'light', 'notifications' => true])
             ],
             [
-                'name' => 'Jane Smith',
-                'identifier' => 'jane.smith@techstart.com',
+                'name' => 'Cliente Construvasco',
+                'identifier' => 'cliente@construvasco.co.mz',
                 'type' => 'email',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make('12345678'),
                 'verified_at' => now(),
                 'is_active' => true,
                 'settings' => json_encode(['theme' => 'auto', 'notifications' => false])
             ],
-            [
-                'name' => 'Bob Wilson',
-                'identifier' => 'bob.wilson@global.com',
-                'type' => 'email',
-                'password' => Hash::make('password123'),
-                'verified_at' => now(),
-                'is_active' => true,
-                'settings' => json_encode(['theme' => 'dark', 'notifications' => true])
-            ],
-            [
-                'name' => 'Alice Johnson',
-                'identifier' => 'alice.johnson@innovation.com',
-                'type' => 'email',
-                'password' => Hash::make('password123'),
-                'verified_at' => now(),
-                'is_active' => true,
-                'settings' => json_encode(['theme' => 'light', 'notifications' => true])
-            ],
-            [
-                'name' => 'Charlie Brown',
-                'identifier' => '+1234567890',
-                'type' => 'whatsapp',
-                'password' => Hash::make('password123'),
-                'verified_at' => now(),
-                'is_active' => true,
-                'settings' => json_encode(['theme' => 'auto', 'notifications' => true])
-            ],
-            [
-                'name' => 'Diana Prince',
-                'identifier' => 'diana.prince@acme.com',
-                'type' => 'email',
-                'password' => Hash::make('password123'),
-                'verified_at' => now(),
-                'is_active' => true,
-                'settings' => json_encode(['theme' => 'dark', 'notifications' => false])
-            ],
-            [
-                'name' => 'Eve Adams',
-                'identifier' => 'eve.adams@techstart.com',
-                'type' => 'email',
-                'password' => Hash::make('password123'),
-                'verified_at' => now(),
-                'is_active' => true,
-                'settings' => json_encode(['theme' => 'light', 'notifications' => true])
-            ]
         ];
 
+        $allowedIdentifiers = array_column($users, 'identifier');
+        User::whereNotIn('identifier', $allowedIdentifiers)->delete();
+
         foreach ($users as $userData) {
-            User::create($userData);
+            User::updateOrCreate(
+                ['identifier' => $userData['identifier']],
+                $userData
+            );
         }
     }
 } 

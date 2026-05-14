@@ -13,14 +13,18 @@ use Illuminate\Support\Str;
 
 class OnlinePaymentController extends Controller
 {
-    // Updated
-    private $baseUrl = 'https://e2payments.explicador.co.mz';
-    private $clientId = '9ea454d7-6218-40d8-8aff-1241150f93d7';
-    private $clientSecret = 'RYcEedYnUVdWXHz71PbOy6ejiB0HHXuFQGXyG7Lz';
-    
-    // Test mode: Set to true to use 1 MT for all payments (for testing purposes)
-    // Set to false for production
-    private $testMode = true;
+    private string $baseUrl;
+    private string $clientId;
+    private string $clientSecret;
+    private bool $testMode;
+
+    public function __construct()
+    {
+        $this->baseUrl = (string) env('PAYMENT_BASE_URL', 'https://e2payments.explicador.co.mz');
+        $this->clientId = (string) env('PAYMENT_CLIENT_ID', '');
+        $this->clientSecret = (string) env('PAYMENT_CLIENT_SECRET', '');
+        $this->testMode = (bool) env('PAYMENT_TEST_MODE', true);
+    }
 
     // Obtains the token for authentication
     private function obterToken()

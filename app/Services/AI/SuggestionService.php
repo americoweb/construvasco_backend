@@ -378,6 +378,30 @@ PROMPT;
         }
     }
 
+    public function generateHouseRender(int $productId, array $designData): string
+    {
+        $basePrompt = trim((string) ($designData['design_prompt'] ?? ''));
+        $designData['design_prompt'] = "Crie um render arquitetônico realista de uma casa em Moçambique, com foco em fachada e volumetria. {$basePrompt}";
+
+        return $this->generateMockup($productId, $designData);
+    }
+
+    public function generateFloorPlan(int $productId, array $designData, string $houseImageUrl = ''): string
+    {
+        $basePrompt = trim((string) ($designData['design_prompt'] ?? ''));
+        $designData['design_prompt'] = "Crie uma planta baixa técnica correspondente à casa descrita, com divisão de ambientes, circulação e proporções realistas. {$basePrompt}";
+
+        if (!empty($houseImageUrl) && empty($designData['reference_image_base64'])) {
+            $houseImageContent = @file_get_contents($houseImageUrl);
+            if ($houseImageContent !== false) {
+                $designData['reference_image_base64'] = base64_encode($houseImageContent);
+                $designData['reference_image_mime_type'] = 'image/png';
+            }
+        }
+
+        return $this->generateMockup($productId, $designData);
+    }
+
     public function refineDesign(string $currentPrompt, string $feedback): string
     {
         $prompt = <<<REFINE_PROMPT

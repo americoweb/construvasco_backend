@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Settings\Tenant;
-use Illuminate\Support\Str;
+use App\Models\User;
 
 class TenantSeeder extends Seeder
 {
@@ -13,63 +13,32 @@ class TenantSeeder extends Seeder
      */
     public function run(): void
     {
+        $admin = User::where('identifier', 'admin@construvasco.co.mz')->first();
+
         $tenants = [
             [
-                'name' => 'Acme Corporation',
-                'slug' => 'acme-corp',
-                'domain' => 'acme.example.com',
-                'database' => 'acme_db',
+                'name' => 'Construvasco',
+                'slug' => 'construvasco',
+                'domain' => 'construvasco.local',
+                'database' => 'constru_db',
                 'settings' => json_encode([
-                    'timezone' => 'UTC',
-                    'locale' => 'en',
-                    'currency' => 'USD'
+                    'timezone' => 'Africa/Maputo',
+                    'locale' => 'pt',
+                    'currency' => 'MZN'
                 ]),
                 'is_active' => true,
-                'created_by' => 1
-            ],
-            [
-                'name' => 'TechStart Inc',
-                'slug' => 'techstart',
-                'domain' => 'techstart.example.com',
-                'database' => 'techstart_db',
-                'settings' => json_encode([
-                    'timezone' => 'America/New_York',
-                    'locale' => 'en',
-                    'currency' => 'USD'
-                ]),
-                'is_active' => true,
-                'created_by' => 1
-            ],
-            [
-                'name' => 'Global Solutions Ltd',
-                'slug' => 'global-solutions',
-                'domain' => 'global.example.com',
-                'database' => 'global_db',
-                'settings' => json_encode([
-                    'timezone' => 'Europe/London',
-                    'locale' => 'en',
-                    'currency' => 'GBP'
-                ]),
-                'is_active' => true,
-                'created_by' => 1
-            ],
-            [
-                'name' => 'Innovation Hub',
-                'slug' => 'innovation-hub',
-                'domain' => 'innovation.example.com',
-                'database' => 'innovation_db',
-                'settings' => json_encode([
-                    'timezone' => 'Asia/Tokyo',
-                    'locale' => 'en',
-                    'currency' => 'JPY'
-                ]),
-                'is_active' => true,
-                'created_by' => 1
+                'created_by' => $admin?->id
             ]
         ];
 
+        $allowedSlugs = array_column($tenants, 'slug');
+        Tenant::whereNotIn('slug', $allowedSlugs)->delete();
+
         foreach ($tenants as $tenantData) {
-            Tenant::create($tenantData);
+            Tenant::updateOrCreate(
+                ['slug' => $tenantData['slug']],
+                $tenantData
+            );
         }
     }
 } 

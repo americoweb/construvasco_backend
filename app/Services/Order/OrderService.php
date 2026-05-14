@@ -198,6 +198,36 @@ class OrderService
         return $order->fresh(['items', 'statusHistory', 'jobCard']);
     }
 
+    public function markTriaged(int $id): Order
+    {
+        return $this->updateStatus($id, OrderStatus::TRIAGED, 'Pedido triado pela recepção/admin');
+    }
+
+    public function markAssigned(int $id): Order
+    {
+        return $this->updateStatus($id, OrderStatus::ASSIGNED, 'Pedido atribuído a técnico/arquiteto');
+    }
+
+    public function markInDesign(int $id): Order
+    {
+        return $this->updateStatus($id, OrderStatus::IN_DESIGN, 'Projeto em desenvolvimento');
+    }
+
+    public function markAwaitingClient(int $id): Order
+    {
+        return $this->updateStatus($id, OrderStatus::AWAITING_CLIENT, 'Aguardando feedback/aprovação do cliente');
+    }
+
+    public function markApproved(int $id): Order
+    {
+        return $this->updateStatus($id, OrderStatus::APPROVED, 'Projeto aprovado pelo cliente');
+    }
+
+    public function markInExecution(int $id): Order
+    {
+        return $this->updateStatus($id, OrderStatus::IN_EXECUTION, 'Projeto em execução');
+    }
+
     public function markInProduction(int $id): Order
     {
         return $this->updateStatus($id, OrderStatus::IN_PRODUCTION, 'Pedido em produção');

@@ -27,16 +27,25 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'identifier' => 'required|string',
+            'identifier' => 'nullable|string',
+            'email' => 'nullable|string',
             'password' => 'required|string',
             'tenant_id' => 'nullable|integer|exists:tenants,id',
         ]);
 
-        $identifier = $request->get('identifier');
-        $password = $request->get('password');
+        $raw = $request->input('identifier') ?: $request->input('email');
+        $identifier = $raw !== null && $raw !== '' ? strtolower(trim((string) $raw)) : '';
 
-        // Find user by identifier
-        $user = User::where('identifier', $identifier)->first();
+        if ($identifier === '') {
+            throw ValidationException::withMessages([
+                'identifier' => ['Indique o email (identifier ou email) e a palavra-passe.'],
+            ]);
+        }
+
+        $password = (string) $request->get('password');
+
+        // Case-insensitive match on identifier (emails stored lowercase from seeders)
+        $user = User::whereRaw('LOWER(identifier) = ?', [$identifier])->first();
 
         if (!$user || !Hash::check($password, $user->password)) {
             $this->activityLogService->logSecurityEvent('failed_login_attempt', [
@@ -58,9 +67,9 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Handle tenant context
-        if ($request->has('tenant_id')) {
-            $tenantId = $request->get('tenant_id');
+        // Handle tenant context (ignore null / "" — has() is true for JSON null)
+        if ($request->filled('tenant_id')) {
+            $tenantId = (int) $request->get('tenant_id');
             if (!$user->belongsToTenant($tenantId)) {
                 return response()->json([
                     'error' => 'You do not have access to the requested organization.'
@@ -68,10 +77,11 @@ class AuthController extends Controller
             }
             $user->switchTenant($tenantId);
         } else {
-            // Set to first available tenant
+            // SPA + JWT: session may not persist; switchTenant sets pivot + session for web,
+            // and getCurrentTenantId() now falls back to tenant_users pivot for API requests.
             $firstTenant = $user->activeTenants()->first();
             if ($firstTenant) {
-                session(['tenant_id' => $firstTenant->id]);
+                $user->switchTenant($firstTenant->id);
             }
         }
 
@@ -93,44 +103,128 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'identifier' => 'nullable|string|max:255',
+            'email' => 'nullable|string|max:255',
+            'type' => 'nullable|in:email,whatsapp',
             'password' => 'required|string|min:8|confirmed',
-            'organization_name' => 'required|string|max:255|unique:tenants,name',
         ]);
 
-        try {
-            $user = User::create([
-                'name' => $request->get('name'),
-                'email' => $request->get('email'),
-                'password' => Hash::make($request->get('password')),
-                'is_active' => true,
+        $raw = $request->input('identifier') ?: $request->input('email');
+        $identifier = trim((string) $raw);
+        if ($identifier === '') {
+            throw ValidationException::withMessages([
+                'identifier' => ['Indique um email válido para criar a conta.'],
             ]);
+        }
 
-            // Create organization and make user owner
-            $tenant = app(\App\Services\TenantService::class)->createTenant([
-                'name' => $request->get('organization_name'),
-                'is_active' => true,
-            ], $user);
+        $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL) !== false;
+        $type = $request->input('type') ?: ($isEmail ? 'email' : 'whatsapp');
+        if ($type === 'email') {
+            $identifier = strtolower($identifier);
+            if (!filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+                throw ValidationException::withMessages([
+                    'identifier' => ['Email inválido.'],
+                ]);
+            }
+        }
 
-            $token = JWTAuth::fromUser($user);
+        try {
+            $response = DB::transaction(function () use ($request, $identifier, $type) {
+                $existingUser = User::whereRaw('LOWER(identifier) = ?', [strtolower($identifier)])->first();
+                if ($existingUser) {
+                    throw ValidationException::withMessages([
+                        'identifier' => ['Este identificador já está em uso.'],
+                    ]);
+                }
 
-            $this->activityLogService->logUserAction('user_registered', $user);
+                $user = User::create([
+                    'name' => $request->get('name'),
+                    'identifier' => $identifier,
+                    'type' => $type,
+                    'password' => Hash::make($request->get('password')),
+                    'is_active' => true,
+                ]);
 
-            return response()->json([
-                'access_token' => $token,
-                'token_type' => 'bearer',
-                'expires_in' => JWTAuth::factory()->getTTL() * 60,
-                'user' => new UserResource($user),
-                'current_tenant' => new TenantResource($tenant),
-                'message' => 'Registration successful'
-            ], 201);
+                $tenantId = 1;
+                $customerRole = Role::where('name', 'customer')->where('guard_name', 'api')->first();
+                if (!$customerRole) {
+                    $customerRole = Role::create([
+                        'name' => 'customer',
+                        'guard_name' => 'api',
+                        'display_name' => 'Customer',
+                        'description' => 'Customer access',
+                        'is_system' => true,
+                    ]);
+                }
+
+                $user->tenants()->attach($tenantId, [
+                    'role_id' => $customerRole->id,
+                    'current_tenant' => true,
+                    'status' => 'active',
+                ]);
+                $user->switchTenant($tenantId);
+
+                DB::table('model_has_roles')->updateOrInsert(
+                    [
+                        'role_id' => $customerRole->id,
+                        'model_type' => get_class($user),
+                        'model_id' => $user->id,
+                        'tenant_id' => $tenantId,
+                    ],
+                    []
+                );
+
+                $token = JWTAuth::fromUser($user);
+                $this->activityLogService->logUserAction('user_registered', $user);
+
+                return response()->json([
+                    'access_token' => $token,
+                    'token_type' => 'bearer',
+                    'expires_in' => JWTAuth::factory()->getTTL() * 60,
+                    'user' => new UserResource($user),
+                    'current_tenant' => $user->getCurrentTenant() ? new TenantResource($user->getCurrentTenant()) : null,
+                    'message' => 'Registration successful'
+                ], 201);
+            });
+
+            return $response;
 
         } catch (\Exception $e) {
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
             return response()->json([
                 'error' => 'Registration failed',
                 'message' => $e->getMessage()
             ], 422);
         }
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = auth('api')->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+        if (!Hash::check((string) $request->input('current_password'), (string) $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Palavra-passe atual incorreta.'],
+            ]);
+        }
+
+        $user->update([
+            'password' => Hash::make((string) $request->input('password')),
+            'must_change' => false,
+        ]);
+
+        return response()->json([
+            'message' => 'Senha alterada com sucesso.',
+        ]);
     }
 
     public function me(): JsonResponse

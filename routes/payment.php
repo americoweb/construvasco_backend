@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\OnlinePayment\OnlinePaymentController;
-use App\Http\Controllers\OnlinePayment\PaymentWebhookController;
+use App\Http\Controllers\Construction\ProjectPaymentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,6 +21,6 @@ Route::group(['prefix' => 'payments'], function ($router) {
     
     // Webhook endpoint for payment gateway callbacks
     // This should be publicly accessible (no auth required) but should validate webhook signature
-    Route::post('webhook', [PaymentWebhookController::class, 'handle']);
+    Route::post('webhook', [ProjectPaymentController::class, 'webhook']);
 });
 

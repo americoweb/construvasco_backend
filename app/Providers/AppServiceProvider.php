@@ -3,34 +3,14 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Forms\FormTemplate;
 use App\Models\Forms\FormInstance;
 use App\Observers\Forms\FormTemplateObserver;
 use App\Observers\Forms\FormInstanceObserver;
 use App\Repositories\Candidate\Contracts\CandidateRepositoryInterface;
 use App\Repositories\Candidate\CandidateRepository;
-use App\Repositories\Product\Contracts\ProductRepositoryInterface;
-use App\Repositories\Product\Contracts\ProductColorRepositoryInterface;
-use App\Repositories\Product\Contracts\ProductPrintAreaRepositoryInterface;
-use App\Repositories\Product\Contracts\CategoryRepositoryInterface;
-use App\Repositories\Product\Contracts\TagRepositoryInterface;
-use App\Repositories\Product\Eloquent\EloquentProductRepository;
-use App\Repositories\Product\Eloquent\EloquentProductColorRepository;
-use App\Repositories\Product\Eloquent\EloquentProductPrintAreaRepository;
-use App\Repositories\Product\Eloquent\EloquentCategoryRepository;
-use App\Repositories\Product\Eloquent\EloquentTagRepository;
-use App\Repositories\Design\Contracts\DesignRepositoryInterface;
-use App\Repositories\Design\Contracts\DesignRefinementRepositoryInterface;
-use App\Repositories\Design\Eloquent\EloquentDesignRepository;
-use App\Repositories\Design\Eloquent\EloquentDesignRefinementRepository;
-use App\Repositories\Cart\Contracts\CartRepositoryInterface;
-use App\Repositories\Cart\Contracts\CartItemRepositoryInterface;
-use App\Repositories\Cart\Eloquent\EloquentCartRepository;
-use App\Repositories\Cart\Eloquent\EloquentCartItemRepository;
-use App\Repositories\Order\Contracts\OrderRepositoryInterface;
-use App\Repositories\Order\Contracts\OrderItemRepositoryInterface;
-use App\Repositories\Order\Eloquent\EloquentOrderRepository;
-use App\Repositories\Order\Eloquent\EloquentOrderItemRepository;
 use App\Repositories\JobCard\Contracts\JobCardRepositoryInterface;
 use App\Repositories\JobCard\Eloquent\EloquentJobCardRepository;
 
@@ -44,27 +24,6 @@ class AppServiceProvider extends ServiceProvider
         
         // Register repositories
         $this->app->bind(CandidateRepositoryInterface::class, CandidateRepository::class);
-        
-        // Register Product repositories
-        $this->app->bind(ProductRepositoryInterface::class, EloquentProductRepository::class);
-        $this->app->bind(ProductColorRepositoryInterface::class, EloquentProductColorRepository::class);
-        $this->app->bind(ProductPrintAreaRepositoryInterface::class, EloquentProductPrintAreaRepository::class);
-        $this->app->bind(CategoryRepositoryInterface::class, EloquentCategoryRepository::class);
-        $this->app->bind(TagRepositoryInterface::class, EloquentTagRepository::class);
-        
-        // Register Design repositories
-        $this->app->bind(DesignRepositoryInterface::class, EloquentDesignRepository::class);
-        $this->app->bind(DesignRefinementRepositoryInterface::class, EloquentDesignRefinementRepository::class);
-        
-        // Register Cart repositories
-        $this->app->bind(CartRepositoryInterface::class, EloquentCartRepository::class);
-        $this->app->bind(CartItemRepositoryInterface::class, EloquentCartItemRepository::class);
-        
-        // Register Order repositories
-        $this->app->bind(OrderRepositoryInterface::class, EloquentOrderRepository::class);
-        $this->app->bind(OrderItemRepositoryInterface::class, EloquentOrderItemRepository::class);
-
-        // Register JobCard repositories
         $this->app->bind(JobCardRepositoryInterface::class, EloquentJobCardRepository::class);
         
         // Register AI resume parser
@@ -87,6 +46,18 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
+        RateLimiter::for('auth-login', function (\Illuminate\Http\Request $request) {
+            $key = strtolower((string) $request->input('identifier', $request->input('email', '')));
+            return Limit::perMinute(5)->by($request->ip() . '|' . sha1($key));
+        });
+
+        RateLimiter::for('auth-register', function (\Illuminate\Http\Request $request) {
+            return Limit::perHour(10)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-google', function (\Illuminate\Http\Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
         // Set tenant context in views
         view()->composer('*', function ($view) {
             if (auth('api')->check()) {
@@ -101,3 +72,4 @@ class AppServiceProvider extends ServiceProvider
 
     }
 }
+

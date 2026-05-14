@@ -9,6 +9,8 @@ Route::prefix('v1/ai')->group(function () {
     
     // Generate mockup for a specific product
     Route::post('mockup', [SuggestionController::class, 'generateMockup']);
+    Route::post('house', [SuggestionController::class, 'generateHouse']);
+    Route::post('floorplan', [SuggestionController::class, 'generateFloorPlan']);
     
     // Refine design based on feedback
     Route::post('refine', [SuggestionController::class, 'refineDesign']);

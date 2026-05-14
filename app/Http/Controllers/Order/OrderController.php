@@ -111,6 +111,26 @@ class OrderController extends Controller
         ]);
     }
 
+    public function triage(int $id): JsonResponse
+    {
+        $order = $this->orderService->markTriaged($id);
+
+        return response()->json([
+            'data' => new OrderResource($order),
+            'message' => 'Pedido triado com sucesso'
+        ]);
+    }
+
+    public function assign(int $id): JsonResponse
+    {
+        $order = $this->orderService->markAssigned($id);
+
+        return response()->json([
+            'data' => new OrderResource($order),
+            'message' => 'Pedido atribuído com sucesso'
+        ]);
+    }
+
     public function markInProduction(int $id): JsonResponse
     {
         $order = $this->orderService->markInProduction($id);
@@ -118,6 +138,46 @@ class OrderController extends Controller
         return response()->json([
             'data' => new OrderResource($order),
             'message' => 'Pedido marcado como em produção'
+        ]);
+    }
+
+    public function markInDesign(int $id): JsonResponse
+    {
+        $order = $this->orderService->markInDesign($id);
+
+        return response()->json([
+            'data' => new OrderResource($order),
+            'message' => 'Pedido marcado como em projeto'
+        ]);
+    }
+
+    public function markAwaitingClient(int $id): JsonResponse
+    {
+        $order = $this->orderService->markAwaitingClient($id);
+
+        return response()->json([
+            'data' => new OrderResource($order),
+            'message' => 'Pedido marcado como aguardando cliente'
+        ]);
+    }
+
+    public function approve(int $id): JsonResponse
+    {
+        $order = $this->orderService->markApproved($id);
+
+        return response()->json([
+            'data' => new OrderResource($order),
+            'message' => 'Pedido aprovado com sucesso'
+        ]);
+    }
+
+    public function markInExecution(int $id): JsonResponse
+    {
+        $order = $this->orderService->markInExecution($id);
+
+        return response()->json([
+            'data' => new OrderResource($order),
+            'message' => 'Pedido marcado como em execução'
         ]);
     }
 

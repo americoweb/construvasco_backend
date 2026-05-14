@@ -29,6 +29,8 @@ class GenerateMockupRequest extends FormRequest
             'reference_image_mime_type' => 'required_with:reference_image_base64|string',
             'color_id' => 'sometimes|integer|exists:product_colors,id',
             'print_area_id' => 'sometimes|integer|exists:product_print_areas,id',
+            'generation_id' => 'sometimes|string|max:100',
+            'house_image_url' => 'sometimes|nullable|string|max:2048',
         ];
     }
 
