@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Order\Eloquent;
 
+use App\Enums\Order\OrderStatus;
 use App\Models\Order\Order;
 use App\Repositories\Order\Contracts\OrderRepositoryInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -54,12 +55,31 @@ class EloquentOrderRepository implements OrderRepositoryInterface
             ->get();
     }
 
-    public function paginateByUser(int $userId, int $perPage = 15): LengthAwarePaginator
+    public function paginateByUser(int $userId, int $perPage = 15, ?string $status = null, ?string $search = null): LengthAwarePaginator
     {
-        return $this->model->byUser($userId)
+        $allowedStatuses = array_map(
+            static fn (OrderStatus $s) => $s->value,
+            OrderStatus::cases()
+        );
+
+        $query = $this->model->byUser($userId)
             ->with('items')
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+            ->orderBy('created_at', 'desc');
+
+        if ($status !== null && $status !== '' && in_array($status, $allowedStatuses, true)) {
+            $query->where('status', $status);
+        }
+
+        if ($search !== null && $search !== '') {
+            $term = '%' . addcslashes($search, '%_\\') . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('order_number', 'like', $term)
+                    ->orWhere('shipping_name', 'like', $term)
+                    ->orWhere('billing_email', 'like', $term);
+            });
+        }
+
+        return $query->paginate($perPage);
     }
 
     public function getBySession(string $sessionId): Collection

@@ -11,6 +11,7 @@ use App\Http\Requests\JobCard\AddFeedbackRequest;
 use App\Http\Resources\JobCard\JobCardResource;
 use App\Http\Resources\JobCard\JobCardListResource;
 use App\Http\Resources\JobCard\JobCardFeedbackResource;
+use App\Models\JobCard\JobCard;
 use App\Enums\JobCard\JobCardStatus;
 use App\Enums\JobCard\JobCardPriority;
 use Illuminate\Http\Request;
@@ -21,6 +22,18 @@ class JobCardController extends Controller
     public function __construct(
         protected JobCardService $jobCardService
     ) {}
+
+    /**
+     * Ensure linked commercial order is embedded in admin API payloads (single round-trip for cockpit UI).
+     */
+    protected function jobCardResource(JobCard $jobCard): JobCardResource
+    {
+        if ($jobCard->order_id) {
+            $jobCard->loadMissing(['order.items', 'order.statusHistory']);
+        }
+
+        return new JobCardResource($jobCard);
+    }
 
     /** GET /admin/job-cards — paginated list, sorted by priority_score */
     public function index(Request $request): JsonResponse
@@ -67,7 +80,7 @@ class JobCardController extends Controller
         $jobCard = $this->jobCardService->create($validated, $items);
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Job Card criado com sucesso'
         ], 201);
     }
@@ -77,7 +90,7 @@ class JobCardController extends Controller
     {
         $jobCard = $this->jobCardService->getWithRelations($id);
 
-        return response()->json(['data' => new JobCardResource($jobCard)]);
+        return response()->json(['data' => $this->jobCardResource($jobCard)]);
     }
 
     /** PUT /admin/job-cards/{id} */
@@ -86,7 +99,7 @@ class JobCardController extends Controller
         $jobCard = $this->jobCardService->update($id, $request->validated());
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Job Card actualizado com sucesso'
         ]);
     }
@@ -111,7 +124,7 @@ class JobCardController extends Controller
         );
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Status actualizado com sucesso'
         ]);
     }
@@ -122,7 +135,7 @@ class JobCardController extends Controller
         $jobCard = $this->jobCardService->cancel($id, $request->get('reason'), auth()->id());
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Job Card cancelado com sucesso'
         ]);
     }
@@ -144,7 +157,7 @@ class JobCardController extends Controller
         );
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Prioridade actualizada com sucesso'
         ]);
     }
@@ -155,7 +168,7 @@ class JobCardController extends Controller
         $jobCard = $this->jobCardService->removeOverride($id);
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Override de prioridade removido'
         ]);
     }
@@ -170,7 +183,7 @@ class JobCardController extends Controller
         $jobCard = $this->jobCardService->assignDesigner($id, $request->designer_id);
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Designer atribuído com sucesso'
         ]);
     }
@@ -200,7 +213,7 @@ class JobCardController extends Controller
         $jobCard = $this->jobCardService->linkOrder($id, $request->order_id);
 
         return response()->json([
-            'data'    => new JobCardResource($jobCard),
+            'data'    => $this->jobCardResource($jobCard),
             'message' => 'Ordem vinculada com sucesso'
         ]);
     }

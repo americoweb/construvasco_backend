@@ -22,7 +22,7 @@ interface OrderRepositoryInterface
     
     public function getByUser(int $userId): Collection;
     
-    public function paginateByUser(int $userId, int $perPage = 15): LengthAwarePaginator;
+    public function paginateByUser(int $userId, int $perPage = 15, ?string $status = null, ?string $search = null): LengthAwarePaginator;
     
     public function getBySession(string $sessionId): Collection;
     

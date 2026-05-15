@@ -137,9 +137,9 @@ class OrderService
         return $this->orderRepository->getByUser($userId);
     }
 
-    public function paginateByUser(int $userId, int $perPage = 15): LengthAwarePaginator
+    public function paginateByUser(int $userId, int $perPage = 15, ?string $status = null, ?string $search = null): LengthAwarePaginator
     {
-        return $this->orderRepository->paginateByUser($userId, $perPage);
+        return $this->orderRepository->paginateByUser($userId, $perPage, $status, $search);
     }
 
     public function getBySession(string $sessionId): Collection

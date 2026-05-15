@@ -237,7 +237,9 @@ class OrderController extends Controller
         
         $orders = $this->orderService->paginateByUser(
             $userId,
-            $request->get('per_page', 15)
+            (int) $request->get('per_page', 15),
+            $request->filled('status') ? (string) $request->get('status') : null,
+            $request->filled('search') ? (string) $request->get('search') : null
         );
 
         // Load items for each order

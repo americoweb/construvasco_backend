@@ -22,7 +22,8 @@ class PermissionRoleSeeder extends Seeder
 
     private function cleanupLegacyRoles(): void
     {
-        $allowedRoles = ['admin', 'project_manager', 'customer'];
+        // Keep staff roles used by admin UI (job cards, staff designers list, etc.)
+        $allowedRoles = ['admin', 'project_manager', 'customer', 'designer'];
         $rolesToDelete = Role::query()
             ->where('guard_name', 'api')
             ->whereNotIn('name', $allowedRoles)

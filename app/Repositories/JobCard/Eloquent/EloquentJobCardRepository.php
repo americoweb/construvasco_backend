@@ -50,7 +50,16 @@ class EloquentJobCardRepository implements JobCardRepositoryInterface
     public function getWithRelations(int $id): ?JobCard
     {
         return $this->model
-            ->with(['client', 'creator', 'designer', 'items', 'files.uploader', 'feedback.author'])
+            ->with([
+                'client',
+                'creator',
+                'designer',
+                'items',
+                'files.uploader',
+                'feedback.author',
+                'order.items',
+                'order.statusHistory',
+            ])
             ->find($id);
     }
 

@@ -62,6 +62,15 @@ class AdminStaffController extends Controller
     {
         $this->resolveTenantId($request);
 
+        $role = Role::query()
+            ->where('name', 'designer')
+            ->where('guard_name', 'api')
+            ->first();
+
+        if ($role === null) {
+            return response()->json(['data' => []]);
+        }
+
         $designers = User::role('designer', 'api')
             ->where('is_active', true)
             ->orderBy('name')

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\JobCard;
 
+use App\Http\Resources\Order\OrderResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -62,6 +63,10 @@ class JobCardResource extends JsonResource
 
             // Order link
             'order_id'              => $this->order_id,
+            'order'                 => $this->when(
+                $this->relationLoaded('order') && $this->order !== null,
+                fn () => new OrderResource($this->order)
+            ),
 
             // Relations
             'items'    => JobCardItemResource::collection($this->whenLoaded('items')),
