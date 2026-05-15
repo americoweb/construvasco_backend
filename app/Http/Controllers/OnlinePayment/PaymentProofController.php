@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\OnlinePayment;
 
 use App\Http\Controllers\Controller;
-use App\Models\Subscription\PaymentProof;
+use App\Models\Payment\PaymentProof;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 

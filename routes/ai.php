@@ -1,20 +1,12 @@
 <?php
 
+use App\Http\Controllers\AI\AiGenerationController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AI\SuggestionController;
 
-Route::prefix('v1/ai')->group(function () {
-    // Get smart product suggestions
-    Route::post('suggestions', [SuggestionController::class, 'getSuggestions']);
-    
-    // Generate mockup for a specific product
-    Route::post('mockup', [SuggestionController::class, 'generateMockup']);
-    Route::post('house', [SuggestionController::class, 'generateHouse']);
-    Route::post('floorplan', [SuggestionController::class, 'generateFloorPlan']);
-    
-    // Refine design based on feedback
-    Route::post('refine', [SuggestionController::class, 'refineDesign']);
-    
-    // Health check
-    Route::get('health', [SuggestionController::class, 'healthCheck']);
+Route::prefix('v1/ai')->middleware(['auth:api', 'role:customer|admin,api'])->group(function () {
+    Route::get('generations', [AiGenerationController::class, 'index']);
+    Route::post('generations', [AiGenerationController::class, 'store']);
+    Route::get('generations/{id}', [AiGenerationController::class, 'show'])->where('id', '[0-9]+');
+    Route::post('generations/{id}/refine', [AiGenerationController::class, 'refine'])->where('id', '[0-9]+');
+    Route::get('health', [AiGenerationController::class, 'healthCheck']);
 });

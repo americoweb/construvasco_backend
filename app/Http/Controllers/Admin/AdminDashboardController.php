@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\Order\OrderStatus;
-use App\Enums\JobCard\JobCardStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Design\Design;
-use App\Models\Order\Order;
-use App\Models\JobCard\JobCard;
-use App\Models\Product\Category;
-use App\Models\Product\Product;
+use App\Models\Construction\ProjectAssignment;
+use App\Models\Construction\ProjectDeliverable;
+use App\Models\Construction\ProjectMilestone;
+use App\Models\Construction\ProjectPayment;
+use App\Models\Project;
 use Illuminate\Http\JsonResponse;
 
 class AdminDashboardController extends Controller
@@ -18,27 +16,12 @@ class AdminDashboardController extends Controller
     {
         return response()->json([
             'data' => [
-                'orders_total' => Order::count(),
-                'orders_pending' => Order::where('status', OrderStatus::PENDING)->count(),
-                'orders_active' => Order::whereIn('status', [
-                    OrderStatus::CONFIRMED,
-                    OrderStatus::IN_PRODUCTION,
-                    OrderStatus::SHIPPED,
-                ])->count(),
-                'products_total'    => Product::count(),
-                'designs_total'     => Design::count(),
-                'categories_total'  => Category::count(),
-                // Job Cards
-                'job_cards_total'      => JobCard::count(),
-                'job_cards_active'     => JobCard::whereNotIn('status', [JobCardStatus::DONE, JobCardStatus::CANCELLED])->count(),
-                'job_cards_urgent'     => JobCard::where('priority_override', true)
-                                                  ->whereNotIn('status', [JobCardStatus::DONE, JobCardStatus::CANCELLED])
-                                                  ->count(),
-                'job_cards_overdue'    => JobCard::whereNotIn('status', [JobCardStatus::DONE, JobCardStatus::CANCELLED])
-                                                  ->where('deadline', '<', now())
-                                                  ->count(),
-                'job_cards_in_design'  => JobCard::where('status', JobCardStatus::DESIGN)->count(),
-                'job_cards_in_approval'=> JobCard::where('status', JobCardStatus::APPROVAL)->count(),
+                'projects_total' => Project::count(),
+                'projects_active' => Project::whereNotIn('status', ['completed', 'cancelled'])->count(),
+                'milestones_pending' => ProjectMilestone::where('status', 'pending')->count(),
+                'deliverables_submitted' => ProjectDeliverable::where('status', 'submitted')->count(),
+                'assignments_active' => ProjectAssignment::where('status', 'active')->count(),
+                'payments_pending' => ProjectPayment::where('status', 'pending')->count(),
             ],
         ]);
     }

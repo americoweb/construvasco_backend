@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Http\Resources\TenantResource;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use App\Services\Credits\CreditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -19,7 +20,10 @@ use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
-    public function __construct(private ActivityLogService $activityLogService)
+    public function __construct(
+        private ActivityLogService $activityLogService,
+        private CreditService $creditService
+    )
     {
         $this->middleware('auth:api', ['except' => ['login', 'register', 'googleLogin']]);
     }
@@ -175,6 +179,7 @@ class AuthController extends Controller
                 );
 
                 $token = JWTAuth::fromUser($user);
+                $this->creditService->grantInitialCredits($user);
                 $this->activityLogService->logUserAction('user_registered', $user);
 
                 return response()->json([

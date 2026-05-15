@@ -4,20 +4,14 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes - Amazing Print-on-Demand MVP
+| API Routes — Construvasco Digital
 |--------------------------------------------------------------------------
-|
-| Routes for the AI Print-on-Demand MVP Platform
-| Based on PRD requirements
-|
 */
 
-// Health check / Test route
 Route::get('test', function () {
     return response()->json(['message' => 'API is working']);
 });
 
-// Include Amazing app route modules
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/user.php';
 require_once __DIR__ . '/tenants.php';
@@ -25,14 +19,8 @@ require_once __DIR__ . '/permissions.php';
 require_once __DIR__ . '/payment.php';
 require_once __DIR__ . '/ai.php';
 require_once __DIR__ . '/admin.php';
-// Transitional commercial flow kept for Construvasco
-require_once __DIR__ . '/product.php';
-require_once __DIR__ . '/design.php';
-require_once __DIR__ . '/cart.php';
-require_once __DIR__ . '/checkout.php';
-require_once __DIR__ . '/order.php';
-require_once __DIR__ . '/job_card.php';
-require_once __DIR__ . '/construction.php';
-
-// Optional: Include candidate routes if needed (for future features)
-// require_once __DIR__ . '/candidate.php';
+require_once __DIR__ . '/portfolio.php';
+require_once __DIR__ . '/customer.php';
+require_once __DIR__ . '/manager.php';
+require_once __DIR__ . '/technician.php';
+require_once __DIR__ . '/notifications.php';

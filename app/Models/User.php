@@ -17,7 +17,9 @@ class User extends Authenticatable implements JWTSubject
         TenantPermission::hasPermissionTo insteadof HasRoles;
         HasRoles::hasPermissionTo as hasRolePermissionTo;
         TenantPermission::hasRole insteadof HasRoles;
+        TenantPermission::hasAnyRole insteadof HasRoles;
         HasRoles::hasRole as hasRoleBase;
+        HasRoles::hasAnyRole as hasAnyRoleBase;
     }
 
     protected $fillable = [

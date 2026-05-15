@@ -15,6 +15,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'deliverables_disk' => env('FILESYSTEM_DISK_DELIVERABLES', 'local'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

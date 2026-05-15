@@ -11,8 +11,19 @@ class ProjectAssignment extends Model
         'assigned_by',
         'assigned_to',
         'role',
+        'assignment_role',
         'status',
         'assigned_at',
         'unassigned_at',
     ];
+
+    public function assignedUser(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'assigned_to');
+    }
+
+    public function project(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Project::class);
+    }
 }

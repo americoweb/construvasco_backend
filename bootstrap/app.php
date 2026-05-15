@@ -13,9 +13,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->api(prepend: [
+            \App\Http\Middleware\SetApiTenantContext::class,
+        ]);
+
         $middleware->alias([
             'tenant' => TenantMiddleware::class,
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             //'form.session' => \App\Http\Middleware\Forms\FormSessionMiddleware::class,
             //'form.validation' => \App\Http\Middleware\Forms\FormValidationMiddleware::class,
         ]);

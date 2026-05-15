@@ -56,27 +56,18 @@ class AdminStaffController extends Controller
 
     /**
      * GET /admin/staff/designers
-     * Flat list of active designers — for select/autocomplete dropdowns.
+     * Active project managers / technicians — for assignee dropdowns (legacy route name kept).
      */
     public function designers(Request $request): JsonResponse
     {
         $this->resolveTenantId($request);
 
-        $role = Role::query()
-            ->where('name', 'designer')
-            ->where('guard_name', 'api')
-            ->first();
-
-        if ($role === null) {
-            return response()->json(['data' => []]);
-        }
-
-        $designers = User::role('designer', 'api')
+        $staff = User::role(['project_manager', 'admin'], 'api')
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'identifier', 'profile_photo_path']);
 
-        return response()->json(['data' => $designers]);
+        return response()->json(['data' => $staff]);
     }
 
     /**

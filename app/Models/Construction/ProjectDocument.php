@@ -8,9 +8,12 @@ class ProjectDocument extends Model
 {
     protected $fillable = [
         'project_id',
+        'project_request_id',
         'document_type',
         'file_name',
         'file_path',
+        'disk',
+        'original_name',
         'mime_type',
         'size_bytes',
         'uploaded_by',

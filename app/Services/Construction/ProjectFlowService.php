@@ -20,7 +20,8 @@ class ProjectFlowService
             'project_id' => $project->id,
             'assigned_by' => $assignedBy,
             'assigned_to' => $assignedTo,
-            'role' => 'project_manager',
+            'role' => 'technician',
+            'assignment_role' => 'main',
             'status' => 'active',
             'assigned_at' => now(),
         ]);

@@ -170,11 +170,32 @@ trait TenantPermission
     
     public function hasRole($roles, string $guard = null): bool
     {
-        if ($this->getCurrentTenantId()) {
-            return $this->hasTenantRole($roles);
+        $guard = $guard ?? 'api';
+
+        if ($this->getCurrentTenantId() && $this->hasTenantRole($roles)) {
+            return true;
         }
-        
+
+        $tenantId = $this->getCurrentTenantId();
+        if ($tenantId) {
+            app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId($tenantId);
+        }
+
         return parent::hasRole($roles, $guard);
+    }
+
+    public function hasAnyRole($roles, ?string $guard = null): bool
+    {
+        $guard = $guard ?? 'api';
+        $roles = is_array($roles) ? $roles : explode('|', (string) $roles);
+
+        foreach ($roles as $role) {
+            if ($this->hasRole($role, $guard)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     public function getTenantContext($tenantId = null): array
