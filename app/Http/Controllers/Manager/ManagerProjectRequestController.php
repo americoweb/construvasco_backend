@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Manager;
 use App\Constants\NotificationTypes;
 use App\Enums\ProjectRequestStatus;
 use App\Enums\QuoteStatus;
+use App\Enums\QuoteType;
+use App\Mail\QuoteAvailableMail;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BriefingDataRules;
 use App\Models\Construction\ProjectDocument;
 use App\Models\Construction\ProjectRequest;
 use App\Models\Construction\Quote;
 use App\Models\User;
+use App\Services\Construction\QuoteService;
+use App\Services\Mail\EmailDispatcher;
 use App\Services\Notifications\NotificationService;
 use App\Services\Storage\FileStorageService;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +22,11 @@ use Illuminate\Http\Request;
 
 class ManagerProjectRequestController extends Controller
 {
-    public function __construct(private NotificationService $notifications) {}
+    public function __construct(
+        private NotificationService $notifications,
+        private QuoteService $quotes,
+        private EmailDispatcher $emails,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -112,10 +120,17 @@ class ManagerProjectRequestController extends Controller
             'conditions' => 'nullable|string',
             'breakdown' => 'nullable|array',
             'project_template_id' => 'nullable|exists:project_templates,id',
+            'quote_type' => 'nullable|in:architecture,construction',
         ]);
+
+        $quoteType = QuoteType::from($validated['quote_type'] ?? QuoteType::Architecture->value);
+        unset($validated['quote_type']);
+
+        $this->quotes->assertCanCreateQuote($item, $quoteType);
 
         $quote = Quote::create(array_merge($validated, [
             'project_request_id' => $item->id,
+            'quote_type' => $quoteType,
             'created_by_user_id' => $request->user()->id,
             'status' => QuoteStatus::Sent,
             'sent_at' => now(),
@@ -129,6 +144,14 @@ class ManagerProjectRequestController extends Controller
             'reference_type' => Quote::class,
             'reference_id' => $quote->id,
         ]);
+
+        $this->emails->dispatchIdempotent(
+            'quote_available',
+            $item->user,
+            new QuoteAvailableMail($quote->load('projectRequest')),
+            Quote::class,
+            $quote->id,
+        );
 
         return response()->json(['data' => $quote], 201);
     }

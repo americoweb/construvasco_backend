@@ -11,7 +11,7 @@ class CreditTransaction extends Model
 {
     protected $fillable = [
         'user_id', 'type', 'amount', 'balance_after',
-        'reference_type', 'reference_id', 'notes',
+        'reference_type', 'reference_id', 'notes', 'granted_by',
     ];
 
     protected $casts = [

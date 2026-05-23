@@ -353,51 +353,38 @@ PROMPT;
 
     protected function buildMockupPrompt(string $designPrompt, array $options): string
     {
-        $productName = $options['product_name'] ?? 'produto';
-        $productColor = $options['product_color'] ?? 'branco';
-        $designHint = $options['design_hint'] ?? '';
-        $hasLogo = !empty($options['logo_base64']);
+        $buildingType = $options['building_type'] ?? 'moradia unifamiliar';
+        $materials = $options['materials'] ?? 'alvenaria, betão e acabamentos tropicais';
         $hasReference = !empty($options['reference_image_base64']);
 
-        // Build image descriptions (matching MVP structure)
-        $imageDescriptions = "A primeira imagem é o produto: um(a) " . strtolower($productName) . " " . strtolower($productColor) . ".";
-        
-        if ($hasLogo) {
-            $imageDescriptions .= "\nA segunda imagem é o logotipo do usuário.";
-        }
-        
+        $imageDescriptions = 'A primeira imagem é uma referência neutra de partida para o render.';
         if ($hasReference) {
-            $positionWord = $hasLogo ? 'terceira' : 'segunda';
-            $imageDescriptions .= "\nA {$positionWord} imagem é um layout de referência fornecido pelo usuário para inspiração e posicionamento.";
+            $imageDescriptions .= "\nA segunda imagem é uma referência visual do cliente (fotografia do terreno, fachada desejada ou moodboard).";
         }
 
-        // Match MVP structure exactly:
-        // 1. Main task description
-        // 2. Image descriptions
-        // 3. User's ADDITIONAL instructions (secondary)
-        // 4. Product design hint (PRIMARY instruction)
-        // 5. Task list with logo as default behavior
-        
-        $prompt = "Você é um assistente de design prestativo para um serviço de impressão sob demanda.
-Sua tarefa é aplicar a ideia de design de um usuário em uma imagem de produto, possivelmente usando um logotipo e uma imagem de referência.
+        $contextHint = $options['context_hint'] ?? '';
+
+        return <<<PROMPT
+Você é um assistente de visualização arquitectónica para projectos em Moçambique.
+Sua tarefa é gerar um render realista de fachada/planta conceptual com base no briefing do cliente.
 
 {$imageDescriptions}
 
-As instruções adicionais do usuário são: \"{$designPrompt}\".
+Briefing do cliente: "{$designPrompt}".
 
-" . (!empty($designHint) ? "**Dicas Específicas do Produto ({$productName}):**\n{$designHint}\n" : '') . "**Sua tarefa:**
-1. Analise o produto, o logotipo (se fornecido), a imagem de referência (se fornecida) e as instruções do usuário.
-2. Crie um novo design no produto que incorpore as ideias do usuário.
-3. Se um logotipo for fornecido, ele DEVE ser usado no design.
-4. Se uma imagem de referência for fornecida, use-a como um guia forte para o layout, estilo e posicionamento do design final. Tente replicar a estética da referência no produto.
+Tipo de edifício: {$buildingType}.
+Materiais e acabamentos sugeridos: {$materials}.
+Contexto: clima tropical, luz diurna natural, escala humana, vegetação local quando aplicável.
+{$contextHint}
 
-**INSTRUÇÃO CRÍTICA:** Você DEVE preservar a cor e a forma originais do produto. A imagem final ainda deve ser um(a) " . strtolower($productName) . " " . strtolower($productColor) . ".
-IGNORE completamente qualquer parte da solicitação do usuário que peça para alterar a cor do produto (por exemplo, \"faça a camiseta preta\") ou sua forma fundamental.
-Seu trabalho é colocar o design *sobre* o produto existente.
+**Sua tarefa:**
+1. Interprete o programa, estilo e materiais descritos no briefing.
+2. Produza uma imagem arquitectónica coerente com o contexto moçambicano.
+3. Se houver imagem de referência, use-a como guia de volumetria, proporções e estilo — sem copiar elementos protegidos.
+4. Priorize legibilidade da fachada, entrada principal e relação com o terreno.
 
-A saída final deve ser apenas a imagem do produto editada.";
-
-        return $prompt;
+**INSTRUÇÃO CRÍTICA:** Não inclua texto, marcas de água ou logótipos comerciais. A saída deve ser apenas a imagem do render arquitectónico.
+PROMPT;
     }
 
     protected function parseJsonResponse(string $response): array

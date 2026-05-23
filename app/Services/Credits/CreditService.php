@@ -127,6 +127,30 @@ class CreditService
             ->get();
     }
 
+    public function manualGrant(User $user, int $amount, string $notes, User $admin): CreditBalance
+    {
+        if ($amount <= 0) {
+            throw new RuntimeException('Invalid credit amount.');
+        }
+
+        return DB::transaction(function () use ($user, $amount, $notes, $admin) {
+            $balance = $this->getOrCreateBalance($user);
+            $balance->balance += $amount;
+            $balance->save();
+
+            CreditTransaction::create([
+                'user_id' => $user->id,
+                'type' => CreditTransactionType::ManualGrant,
+                'amount' => $amount,
+                'balance_after' => $balance->balance,
+                'notes' => $notes,
+                'granted_by' => $admin->id,
+            ]);
+
+            return $balance->fresh();
+        });
+    }
+
     public function getOrCreateBalance(User $user): CreditBalance
     {
         return CreditBalance::firstOrCreate(

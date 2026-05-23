@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Constants\NotificationTypes;
+use App\Enums\AiGenerationStatus;
 use App\Enums\ProjectRequestStatus;
 use App\Http\Controllers\Controller;
+use App\Mail\ProjectRequestSubmittedMail;
 use App\Http\Requests\BriefingDataRules;
 use App\Models\AI\AiGeneration;
 use App\Models\Construction\ProjectDocument;
 use App\Models\Construction\ProjectRequest;
+use App\Services\Mail\EmailDispatcher;
 use App\Services\Notifications\NotificationService;
 use App\Services\Storage\FileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CustomerProjectRequestController extends Controller
 {
-    public function __construct(private NotificationService $notifications) {}
+    public function __construct(
+        private NotificationService $notifications,
+        private EmailDispatcher $emails,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -76,14 +83,37 @@ class CustomerProjectRequestController extends Controller
             'reference_id' => $item->id,
         ]);
 
+        $this->emails->dispatchIdempotent(
+            'project_request_submitted',
+            $request->user(),
+            new ProjectRequestSubmittedMail($item->fresh()),
+            ProjectRequest::class,
+            $item->id,
+        );
+
         return response()->json(['data' => $item->fresh()]);
     }
 
     public function approveAiGeneration(Request $request, int $id, int $generationId): JsonResponse
     {
         $item = ProjectRequest::where('user_id', $request->user()->id)->findOrFail($id);
-        $gen = AiGeneration::where('user_id', $request->user()->id)->findOrFail($generationId);
-        $item->update(['approved_ai_generation_id' => $gen->id]);
+        $gen = AiGeneration::where('user_id', $request->user()->id)
+            ->where('project_request_id', $item->id)
+            ->findOrFail($generationId);
+
+        DB::transaction(function () use ($item, $gen) {
+            if ($item->approved_ai_generation_id && (int) $item->approved_ai_generation_id !== (int) $gen->id) {
+                AiGeneration::where('id', $item->approved_ai_generation_id)
+                    ->update(['status' => AiGenerationStatus::Superseded]);
+            }
+
+            $item->update(['approved_ai_generation_id' => $gen->id]);
+
+            activity('ai_generations')
+                ->performedOn($gen)
+                ->withProperties(['event' => 'mockup_approved', 'project_request_id' => $item->id])
+                ->log('Mockup aprovado pelo cliente');
+        });
 
         return response()->json(['data' => $item->fresh(['approvedAiGeneration'])]);
     }

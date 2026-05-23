@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminCreditPackageController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminProjectTemplateController;
+use App\Http\Controllers\Admin\AdminCreditController;
 use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminStaffController;
 use App\Http\Controllers\Manager\ManagerProjectController;
@@ -43,5 +44,8 @@ Route::prefix('v1')->middleware(['auth:api'])->group(function () {
 
     Route::get('admin/reports/financial', [AdminReportController::class, 'financial']);
     Route::get('admin/reports/operational', [AdminReportController::class, 'operational']);
+
+    Route::get('admin/users/{id}/credits', [AdminCreditController::class, 'show']);
+    Route::post('admin/users/{id}/credits/grant', [AdminCreditController::class, 'grant']);
     });
 });

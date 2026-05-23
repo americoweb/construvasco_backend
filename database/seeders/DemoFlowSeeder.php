@@ -2,33 +2,81 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AiGenerationStatus;
+use App\Enums\AiGenerationType;
+use App\Enums\ProjectContractPhase;
 use App\Enums\ProjectRequestStatus;
 use App\Enums\QuoteStatus;
+use App\Enums\QuoteType;
+use App\Models\AI\AiGeneration;
+use App\Models\Construction\ProjectAssignment;
 use App\Models\Construction\ProjectRequest;
 use App\Models\Construction\Quote;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Construction\QuoteService;
+use App\Services\Credits\CreditService;
 use Illuminate\Database\Seeder;
 
 /**
- * Dados demo para smoke test MVP: pedido → orçamento (pendente) + projecto já aceite.
+ * Dados demo Bloco 1: estúdio + arquitectura + projecto activo (sem fase obra).
  */
 class DemoFlowSeeder extends Seeder
 {
     public function run(): void
     {
-        // Contexto de tenant obrigatório em CLI (evita auth('api')/JWT no TenantScope).
         if (! session('tenant_id')) {
             session(['tenant_id' => 1]);
         }
 
         $cliente = User::where('identifier', 'cliente@construvasco.co.mz')->first();
         $gestor = User::where('identifier', 'gestor@construvasco.co.mz')->first();
+        $tecnico = User::where('identifier', 'tecnico@construvasco.co.mz')->first();
 
         if (! $cliente || ! $gestor) {
             return;
         }
+
+        app(CreditService::class)->grantInitialCredits($cliente);
+
+        $studioRequest = ProjectRequest::firstOrCreate(
+            ['reference_code' => 'DEMO-PED-STUDIO'],
+            [
+                'user_id' => $cliente->id,
+                'project_type' => 'residencial',
+                'tipologia' => 't4',
+                'title' => 'Moradia T4 — Estúdio demo',
+                'description' => 'Pedido submetido com mockup aprovado para testes do estúdio.',
+                'localizacao' => 'Maputo, Moçambique',
+                'area_m2' => 220,
+                'num_pisos' => 2,
+                'status' => ProjectRequestStatus::Submitted,
+                'submitted_at' => now()->subDays(3),
+                'briefing_data' => [
+                    'estilo_arquitectonico' => 'contemporâneo tropical',
+                    'paleta_acabamento' => 'terracota, branco e madeira',
+                    'programa' => 'sala, cozinha, 4 quartos, varanda',
+                ],
+            ]
+        );
+
+        $mockup = AiGeneration::firstOrCreate(
+            [
+                'project_request_id' => $studioRequest->id,
+                'user_id' => $cliente->id,
+                'type' => AiGenerationType::FacadeRender,
+            ],
+            [
+                'prompt' => 'Render de fachada — demo Bloco 1',
+                'status' => AiGenerationStatus::Completed,
+                'image_path' => 'renders/demo_mockup.png',
+                'image_url' => '/storage/renders/demo_mockup.png',
+                'credits_consumed' => 0,
+                'provider' => 'gemini',
+            ]
+        );
+
+        $studioRequest->update(['approved_ai_generation_id' => $mockup->id]);
 
         $pending = ProjectRequest::firstOrCreate(
             ['reference_code' => 'DEMO-PED-001'],
@@ -36,8 +84,8 @@ class DemoFlowSeeder extends Seeder
                 'user_id' => $cliente->id,
                 'project_type' => 'residencial',
                 'tipologia' => 't3',
-                'title' => 'Moradia T3 — Demo MVP',
-                'description' => 'Pedido de demonstração para testar orçamento no portal cliente.',
+                'title' => 'Moradia T3 — Orçamento pendente',
+                'description' => 'Pedido de demonstração com orçamento de arquitectura enviado.',
                 'localizacao' => 'Maputo, Moçambique',
                 'status' => ProjectRequestStatus::Quoted,
                 'submitted_at' => now()->subDays(2),
@@ -46,7 +94,11 @@ class DemoFlowSeeder extends Seeder
         );
 
         Quote::firstOrCreate(
-            ['project_request_id' => $pending->id, 'status' => QuoteStatus::Sent],
+            [
+                'project_request_id' => $pending->id,
+                'quote_type' => QuoteType::Architecture,
+                'status' => QuoteStatus::Sent,
+            ],
             [
                 'created_by_user_id' => $gestor->id,
                 'total_amount_mt' => 1250000,
@@ -63,7 +115,7 @@ class DemoFlowSeeder extends Seeder
                 'project_type' => 'comercial',
                 'tipologia' => 'loja',
                 'title' => 'Loja comercial — Demo aceite',
-                'description' => 'Pedido já convertido em projecto para listagens.',
+                'description' => 'Projecto em fase de arquitectura com técnico atribuído.',
                 'localizacao' => 'Matola',
                 'status' => ProjectRequestStatus::Quoted,
                 'submitted_at' => now()->subDays(10),
@@ -73,13 +125,14 @@ class DemoFlowSeeder extends Seeder
         $acceptedQuote = Quote::firstOrCreate(
             [
                 'project_request_id' => $acceptedRequest->id,
+                'quote_type' => QuoteType::Architecture,
                 'status' => QuoteStatus::Accepted,
             ],
             [
                 'created_by_user_id' => $gestor->id,
                 'total_amount_mt' => 850000,
                 'delivery_days' => 60,
-                'conditions' => 'Demo — projecto já iniciado.',
+                'conditions' => 'Demo — projecto em arquitectura.',
                 'sent_at' => now()->subDays(8),
                 'responded_at' => now()->subDays(7),
             ]
@@ -91,6 +144,30 @@ class DemoFlowSeeder extends Seeder
 
         if (! $projectExists) {
             app(QuoteService::class)->accept($acceptedQuote, $cliente);
+        }
+
+        $project = Project::withoutGlobalScopes()
+            ->where('project_request_id', $acceptedRequest->id)
+            ->first();
+
+        if ($project && $tecnico) {
+            ProjectAssignment::firstOrCreate(
+                [
+                    'project_id' => $project->id,
+                    'assigned_to' => $tecnico->id,
+                    'assignment_role' => 'main',
+                ],
+                [
+                    'assigned_by' => $gestor->id,
+                    'role' => 'technician',
+                    'status' => 'active',
+                    'assigned_at' => now(),
+                ]
+            );
+
+            $project->update([
+                'contract_phase' => ProjectContractPhase::Architecture,
+            ]);
         }
     }
 }

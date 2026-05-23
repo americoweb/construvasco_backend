@@ -7,6 +7,7 @@ use App\Enums\AiGenerationType;
 use App\Models\AI\AiGeneration;
 use App\Models\User;
 use App\Exceptions\InsufficientCreditsException;
+use App\Models\Construction\ProjectRequest;
 use App\Services\Credits\CreditService;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,8 @@ class AiGenerationService
 {
     public function __construct(
         private CreditService $credits,
-        private ArchitecturalAiService $architecturalAi
+        private ArchitecturalAiService $architecturalAi,
+        private BriefingPromptBuilder $briefingPromptBuilder,
     ) {}
 
     public function create(User $user, array $data, ?Request $request = null): AiGeneration
@@ -26,11 +28,19 @@ class AiGenerationService
             throw new InsufficientCreditsException();
         }
 
+        $designPrompt = trim((string) ($data['design_prompt'] ?? ''));
+        if ($designPrompt === '' && ! empty($data['project_request_id'])) {
+            $request = ProjectRequest::find($data['project_request_id']);
+            if ($request) {
+                $designPrompt = $this->briefingPromptBuilder->build($request);
+            }
+        }
+
         $generation = AiGeneration::create([
             'user_id' => $user->id,
             'project_request_id' => $data['project_request_id'] ?? null,
             'type' => $type,
-            'prompt' => $data['design_prompt'] ?? null,
+            'prompt' => $designPrompt ?: null,
             'parameters' => $data,
             'status' => AiGenerationStatus::Processing,
             'provider' => 'gemini',
@@ -41,7 +51,7 @@ class AiGenerationService
             $this->credits->consume($user, $cost, AiGeneration::class, $generation->id);
 
             $designData = [
-                'design_prompt' => $data['design_prompt'] ?? '',
+                'design_prompt' => $designPrompt,
                 'reference_image_base64' => $data['reference_image_base64'] ?? null,
                 'reference_image_mime_type' => $data['reference_image_mime_type'] ?? null,
                 'logo_base64' => $data['logo_base64'] ?? null,

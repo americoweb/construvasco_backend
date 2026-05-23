@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProjectContractPhase;
 use App\Models\Construction\ProjectAssignment;
 use App\Models\Construction\ProjectDeliverable;
 use App\Models\Construction\ProjectInvoice;
@@ -23,13 +24,17 @@ class Project extends Model
     use SoftDeletes, LogsActivityWithTenant, Tenantable;
 
     protected $fillable = [
-        'tenant_id', 'client_user_id', 'project_request_id', 'quote_id', 'project_template_id',
-        'service_category_id', 'construction_service_id', 'name', 'description', 'status',
+        'tenant_id', 'client_user_id', 'project_request_id', 'quote_id', 'construction_quote_id',
+        'project_template_id', 'service_category_id', 'construction_service_id', 'name', 'description',
+        'status', 'contract_phase', 'architecture_completed_at', 'suggested_site_visit_date',
         'project_type', 'location', 'start_date', 'end_date', 'desired_deadline',
         'budget', 'target_budget', 'current_phase', 'client_can_download', 'final_payment_status',
     ];
 
     protected $casts = [
+        'contract_phase' => ProjectContractPhase::class,
+        'architecture_completed_at' => 'datetime',
+        'suggested_site_visit_date' => 'date',
         'start_date' => 'date',
         'end_date' => 'date',
         'desired_deadline' => 'date',
@@ -41,7 +46,9 @@ class Project extends Model
     ];
 
     protected static $logName = 'projects';
-    protected static $logAttributes = ['name', 'description', 'status', 'budget'];
+    protected static $logAttributes = [
+        'name', 'description', 'status', 'budget', 'contract_phase', 'architecture_completed_at',
+    ];
     protected static $logOnlyDirty = true;
 
     public function client(): BelongsTo
@@ -57,6 +64,11 @@ class Project extends Model
     public function quote(): BelongsTo
     {
         return $this->belongsTo(Quote::class);
+    }
+
+    public function constructionQuote(): BelongsTo
+    {
+        return $this->belongsTo(Quote::class, 'construction_quote_id');
     }
 
     public function template(): BelongsTo

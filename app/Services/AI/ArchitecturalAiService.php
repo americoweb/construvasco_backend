@@ -63,11 +63,9 @@ REFINE_PROMPT;
             'image/png',
             $prompt,
             [
-                'product_name' => 'Projeto arquitectónico Construvasco',
-                'product_color' => 'neutro',
-                'print_area' => 'fachada',
-                'logo_base64' => $designData['logo_base64'] ?? null,
-                'logo_mime_type' => $designData['logo_mime_type'] ?? null,
+                'building_type' => $designData['building_type'] ?? 'moradia unifamiliar',
+                'materials' => $designData['materials'] ?? 'alvenaria e betão com acabamentos tropicais',
+                'context_hint' => $designData['context_hint'] ?? '',
                 'reference_image_base64' => $designData['reference_image_base64'] ?? null,
                 'reference_image_mime_type' => $designData['reference_image_mime_type'] ?? null,
             ]

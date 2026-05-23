@@ -12,4 +12,6 @@ enum ProjectRequestStatus: string
     case Rejected = 'rejected';
     case Cancelled = 'cancelled';
     case ConvertedToProject = 'converted_to_project';
+    case ExecutionQuoteRequested = 'execution_quote_requested';
+    case Closed = 'closed';
 }
