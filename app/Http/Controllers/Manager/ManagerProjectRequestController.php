@@ -8,6 +8,7 @@ use App\Enums\QuoteStatus;
 use App\Enums\QuoteType;
 use App\Mail\QuoteAvailableMail;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ManagerProjectRequestDetailResource;
 use App\Http\Requests\BriefingDataRules;
 use App\Models\Construction\ProjectDocument;
 use App\Models\Construction\ProjectRequest;
@@ -74,9 +75,14 @@ class ManagerProjectRequestController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $item = ProjectRequest::with(['user', 'quotes', 'aiGenerations', 'documents'])->findOrFail($id);
+        $item = ProjectRequest::with([
+            'user',
+            'quotes' => fn ($q) => $q->latest(),
+            'documents',
+            'approvedAiGeneration',
+        ])->findOrFail($id);
 
-        return response()->json(['data' => $item]);
+        return response()->json(['data' => new ManagerProjectRequestDetailResource($item)]);
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -115,9 +121,10 @@ class ManagerProjectRequestController extends Controller
     {
         $item = ProjectRequest::findOrFail($id);
         $validated = $request->validate([
-            'total_amount_mt' => 'required|numeric|min:0',
-            'delivery_days' => 'nullable|integer|min:1',
-            'conditions' => 'nullable|string',
+            'total_amount_mt' => 'required|numeric|gt:0',
+            'delivery_days' => 'required|integer|min:1',
+            'conditions' => 'nullable|string|max:5000',
+            'valid_until' => 'nullable|date|after_or_equal:today',
             'breakdown' => 'nullable|array',
             'project_template_id' => 'nullable|exists:project_templates,id',
             'quote_type' => 'nullable|in:architecture,construction',
@@ -126,6 +133,10 @@ class ManagerProjectRequestController extends Controller
         $quoteType = QuoteType::from($validated['quote_type'] ?? QuoteType::Architecture->value);
         unset($validated['quote_type']);
 
+        $expiresAt = $validated['valid_until'] ?? now()->addDays(30)->toDateString();
+        unset($validated['valid_until']);
+
+        $this->quotes->assertRequestAllowsQuote($item);
         $this->quotes->assertCanCreateQuote($item, $quoteType);
 
         $quote = Quote::create(array_merge($validated, [
@@ -134,9 +145,20 @@ class ManagerProjectRequestController extends Controller
             'created_by_user_id' => $request->user()->id,
             'status' => QuoteStatus::Sent,
             'sent_at' => now(),
+            'expires_at' => $expiresAt,
         ]));
 
         $item->update(['status' => ProjectRequestStatus::Quoted]);
+
+        activity('quotes')
+            ->performedOn($quote)
+            ->causedBy($request->user())
+            ->withProperties([
+                'quote_type' => $quoteType->value,
+                'total_amount_mt' => $quote->total_amount_mt,
+                'delivery_days' => $quote->delivery_days,
+            ])
+            ->log('Orçamento de arquitectura enviado ao cliente');
 
         $this->notifications->notify($item->user, NotificationTypes::QUOTE_RECEIVED, [
             'title' => 'Orçamento disponível',

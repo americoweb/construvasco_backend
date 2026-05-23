@@ -21,7 +21,10 @@ class CustomerQuoteController extends Controller
 
     public function accept(Request $request, int $id, QuoteService $quotes): JsonResponse
     {
-        $quote = Quote::with('projectRequest')->findOrFail($id);
+        $quote = Quote::with('projectRequest', 'createdBy')
+            ->whereHas('projectRequest', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->findOrFail($id);
+
         $project = $quotes->accept($quote, $request->user());
 
         return response()->json(['data' => ['quote' => $quote->fresh(), 'project' => $project]]);
@@ -29,9 +32,15 @@ class CustomerQuoteController extends Controller
 
     public function reject(Request $request, int $id, QuoteService $quotes): JsonResponse
     {
-        $validated = $request->validate(['reason' => 'nullable|string|max:500']);
-        $quote = Quote::findOrFail($id);
-        $quote = $quotes->reject($quote, $request->user(), $validated['reason'] ?? null);
+        $validated = $request->validate([
+            'reason' => 'required|string|min:5|max:500',
+        ]);
+
+        $quote = Quote::with('projectRequest')
+            ->whereHas('projectRequest', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->findOrFail($id);
+
+        $quote = $quotes->reject($quote, $request->user(), $validated['reason']);
 
         return response()->json(['data' => $quote]);
     }

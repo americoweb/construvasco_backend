@@ -41,12 +41,51 @@ class QuoteService
         }
     }
 
+    public function assertRequestAllowsQuote(ProjectRequest $request): void
+    {
+        $blocked = [
+            ProjectRequestStatus::Draft,
+            ProjectRequestStatus::Rejected,
+            ProjectRequestStatus::Cancelled,
+            ProjectRequestStatus::Closed,
+            ProjectRequestStatus::ConvertedToProject,
+        ];
+
+        if (in_array($request->status, $blocked, true)) {
+            throw ValidationException::withMessages([
+                'status' => ['O estado actual do pedido não permite enviar orçamento.'],
+            ]);
+        }
+
+        $allowed = [
+            ProjectRequestStatus::Submitted,
+            ProjectRequestStatus::UnderReview,
+            ProjectRequestStatus::Quoted,
+        ];
+
+        if (! in_array($request->status, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'status' => ['O estado actual do pedido não permite enviar orçamento.'],
+            ]);
+        }
+    }
+
+    public function assertQuoteRespondable(Quote $quote): void
+    {
+        if ($quote->status !== QuoteStatus::Sent) {
+            throw ValidationException::withMessages([
+                'quote' => ['Este orçamento já não está disponível para resposta.'],
+            ]);
+        }
+    }
+
     public function accept(Quote $quote, User $customer): Project
     {
         return DB::transaction(function () use ($quote, $customer) {
             $quote->refresh();
             $request = $quote->projectRequest;
             abort_unless($request->user_id === $customer->id, 403);
+            $this->assertQuoteRespondable($quote);
 
             $quoteType = $quote->quote_type ?? QuoteType::Architecture;
 
@@ -62,6 +101,7 @@ class QuoteService
     {
         $request = $quote->projectRequest;
         abort_unless($request->user_id === $customer->id, 403);
+        $this->assertQuoteRespondable($quote);
 
         $quoteType = $quote->quote_type ?? QuoteType::Architecture;
 
@@ -70,6 +110,14 @@ class QuoteService
             'responded_at' => now(),
             'rejection_reason' => $reason,
         ]);
+
+        if ($quoteType === QuoteType::Architecture) {
+            activity('quotes')
+                ->performedOn($quote)
+                ->causedBy($customer)
+                ->withProperties(['rejection_reason' => $reason])
+                ->log('Orçamento de arquitectura recusado pelo cliente');
+        }
 
         if ($quoteType === QuoteType::Construction) {
             $project = Project::withoutGlobalScopes()
@@ -81,7 +129,7 @@ class QuoteService
             }
             $request->update(['status' => ProjectRequestStatus::Closed]);
         } else {
-            $request->update(['status' => ProjectRequestStatus::Rejected]);
+            $request->update(['status' => ProjectRequestStatus::UnderReview]);
         }
 
         $this->notifications->notify($quote->createdBy, NotificationTypes::QUOTE_REJECTED, [
@@ -100,6 +148,11 @@ class QuoteService
             'status' => QuoteStatus::Accepted,
             'responded_at' => now(),
         ]);
+
+        activity('quotes')
+            ->performedOn($quote)
+            ->causedBy($customer)
+            ->log('Orçamento de arquitectura aceite pelo cliente');
 
         $request->update(['status' => ProjectRequestStatus::Approved]);
 
