@@ -19,7 +19,7 @@ class AiGenerationService
         private BriefingPromptBuilder $briefingPromptBuilder,
     ) {}
 
-    public function create(User $user, array $data, ?Request $request = null): AiGeneration
+    public function create(User $user, array $data, ?Request $httpRequest = null): AiGeneration
     {
         $cost = (int) config('credits.cost_per_generation', 1);
         $type = AiGenerationType::from($data['type'] ?? 'facade_render');
@@ -30,9 +30,9 @@ class AiGenerationService
 
         $designPrompt = trim((string) ($data['design_prompt'] ?? ''));
         if ($designPrompt === '' && ! empty($data['project_request_id'])) {
-            $request = ProjectRequest::find($data['project_request_id']);
-            if ($request) {
-                $designPrompt = $this->briefingPromptBuilder->build($request);
+            $projectRequest = ProjectRequest::find($data['project_request_id']);
+            if ($projectRequest) {
+                $designPrompt = $this->briefingPromptBuilder->build($projectRequest);
             }
         }
 
@@ -66,7 +66,7 @@ class AiGenerationService
                 default => $this->architecturalAi->generateHouseRender($designData),
             };
 
-            $baseUrl = $request?->getSchemeAndHttpHost() ?? config('app.url');
+            $baseUrl = $httpRequest?->getSchemeAndHttpHost() ?? config('app.url');
             $imageUrl = rtrim($baseUrl, '/') . '/storage/' . ltrim($path, '/');
 
             $generation->update([

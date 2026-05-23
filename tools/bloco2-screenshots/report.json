@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "step": "1. Login cliente demo",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "step": "2. Saldo 5 créditos",
+      "status": "warn",
+      "detail": "Texto visto: Créditos IA17"
+    },
+    {
+      "step": "3. Ir para estudio",
+      "status": "ok",
+      "detail": "4438ms"
+    },
+    {
+      "step": "4. Wizard passos 1-3",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "step": "5. Gerar mockup",
+      "status": "ok",
+      "detail": "Tempo: 14.9s"
+    },
+    {
+      "step": "6. Imagem na galeria",
+      "status": "ok",
+      "detail": "src=http://127.0.0.1:8000/storage/renders/render_house_177955047..."
+    },
+    {
+      "step": "7. Refinar com confirmação",
+      "status": "ok",
+      "detail": "Tempo: 14.1s, cards visíveis: 4"
+    },
+    {
+      "step": "8. Aprovar mockup",
+      "status": "ok",
+      "detail": "confirmar via SQL no relatório"
+    },
+    {
+      "step": "9. Toggle versões anteriores",
+      "status": "warn",
+      "detail": "badges: 0"
+    },
+    {
+      "step": "10. Submeter pedido",
+      "status": "warn",
+      "detail": "http://127.0.0.1:4200/#/conta/pedidos/6?submitted=1"
+    }
+  ],
+  "genMs": 14904,
+  "refineMs": 14097
+}

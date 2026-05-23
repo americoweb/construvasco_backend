@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\AI;
 
+use App\Enums\AiGenerationStatus;
 use App\Exceptions\InsufficientCreditsException;
 use App\Http\Controllers\Controller;
 use App\Models\AI\AiGeneration;
@@ -17,9 +18,17 @@ class AiGenerationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $items = AiGeneration::where('user_id', $user->id)
-            ->latest()
-            ->paginate((int) $request->get('per_page', 20));
+        $query = AiGeneration::where('user_id', $user->id)->latest();
+
+        if ($request->filled('project_request_id')) {
+            $query->where('project_request_id', (int) $request->get('project_request_id'));
+        }
+
+        if ($request->boolean('exclude_superseded', true)) {
+            $query->where('status', '!=', AiGenerationStatus::Superseded);
+        }
+
+        $items = $query->paginate((int) $request->get('per_page', 20));
 
         return response()->json($items);
     }

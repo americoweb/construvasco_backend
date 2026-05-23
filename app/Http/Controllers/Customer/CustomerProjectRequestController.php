@@ -11,6 +11,7 @@ use App\Http\Requests\BriefingDataRules;
 use App\Models\AI\AiGeneration;
 use App\Models\Construction\ProjectDocument;
 use App\Models\Construction\ProjectRequest;
+use App\Services\Construction\StudioDraftService;
 use App\Services\Mail\EmailDispatcher;
 use App\Services\Notifications\NotificationService;
 use App\Services\Storage\FileStorageService;
@@ -23,6 +24,7 @@ class CustomerProjectRequestController extends Controller
     public function __construct(
         private NotificationService $notifications,
         private EmailDispatcher $emails,
+        private StudioDraftService $studio,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -37,8 +39,18 @@ class CustomerProjectRequestController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if ($request->boolean('from_studio')) {
+            $item = $this->studio->resolveOrCreateDraft($user);
+            $data = $this->validated($request, false);
+            $item->update($data);
+
+            return response()->json(['data' => $item->fresh()], 200);
+        }
+
         $data = $this->validated($request, true);
-        $data['user_id'] = $request->user()->id;
+        $data['user_id'] = $user->id;
         $data['reference_code'] = $this->nextReference();
         $data['status'] = ProjectRequestStatus::Draft;
 

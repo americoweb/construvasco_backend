@@ -5,10 +5,14 @@ use App\Http\Controllers\Customer\CustomerDashboardController;
 use App\Http\Controllers\Customer\CustomerProjectController;
 use App\Http\Controllers\Customer\CustomerProjectRequestController;
 use App\Http\Controllers\Customer\CustomerQuoteController;
+use App\Http\Controllers\Customer\CustomerStudioController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/customer')->middleware(['auth:api', 'role:customer,api'])->group(function () {
     Route::get('dashboard', CustomerDashboardController::class);
+
+    Route::get('studio/state', [CustomerStudioController::class, 'state']);
+    Route::post('studio/reset', [CustomerStudioController::class, 'reset']);
     Route::get('credits/balance', [CustomerCreditController::class, 'balance']);
     Route::get('credits/history', [CustomerCreditController::class, 'history']);
     Route::get('credit-packages', [CustomerCreditController::class, 'packages']);
