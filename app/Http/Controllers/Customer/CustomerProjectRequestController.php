@@ -62,7 +62,7 @@ class CustomerProjectRequestController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $item = ProjectRequest::where('user_id', $request->user()->id)
-            ->with(['quotes', 'aiGenerations', 'documents'])
+            ->with(['quotes', 'aiGenerations', 'documents', 'approvedAiGeneration'])
             ->findOrFail($id);
 
         $this->authorize('view', $item);
@@ -114,16 +114,21 @@ class CustomerProjectRequestController extends Controller
             ->findOrFail($generationId);
 
         DB::transaction(function () use ($item, $gen) {
-            if ($item->approved_ai_generation_id && (int) $item->approved_ai_generation_id !== (int) $gen->id) {
-                AiGeneration::where('id', $item->approved_ai_generation_id)
-                    ->update(['status' => AiGenerationStatus::Superseded]);
-            }
+            $supersededCount = AiGeneration::where('project_request_id', $item->id)
+                ->where('id', '!=', $gen->id)
+                ->where('status', AiGenerationStatus::Completed)
+                ->update(['status' => AiGenerationStatus::Superseded]);
 
             $item->update(['approved_ai_generation_id' => $gen->id]);
 
             activity('ai_generations')
                 ->performedOn($gen)
-                ->withProperties(['event' => 'mockup_approved', 'project_request_id' => $item->id])
+                ->withProperties([
+                    'event' => 'mockup_approved',
+                    'project_request_id' => $item->id,
+                    'approved_generation_id' => $gen->id,
+                    'superseded_count' => $supersededCount,
+                ])
                 ->log('Mockup aprovado pelo cliente');
         });
 
