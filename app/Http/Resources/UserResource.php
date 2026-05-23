@@ -22,6 +22,7 @@ class UserResource extends JsonResource
             'profile_photo_path' => $this->profile_photo_path,
             'avatar_url' => $this->profile_photo_path ? Storage::disk('public')->url($this->profile_photo_path) : null,
             'is_active' => $this->is_active,
+            'must_change' => (bool) $this->must_change,
             'verified_at' => $this->verified_at?->toISOString(),
             'last_login_at' => $this->last_login_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),

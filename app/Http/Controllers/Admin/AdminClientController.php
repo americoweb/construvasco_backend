@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Settings\Tenant;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class AdminClientController extends Controller
 {
@@ -67,6 +70,8 @@ class AdminClientController extends Controller
             'is_active'  => true,
         ]);
 
+        $this->attachAsCustomer($user);
+
         return response()->json([
             'data' => [
                 'id'         => $user->id,
@@ -76,5 +81,33 @@ class AdminClientController extends Controller
                 'type'       => $user->type === 'whatsapp' ? 'phone' : $user->type,
             ],
         ], 201);
+    }
+
+    private function attachAsCustomer(User $user): void
+    {
+        $tenant = Tenant::where('slug', 'construvasco')->first();
+        $tenantId = $tenant?->id ?? 1;
+        $customerRole = Role::firstOrCreate(
+            ['name' => 'customer', 'guard_name' => 'api'],
+            ['display_name' => 'Cliente', 'description' => 'Cliente', 'is_system' => true]
+        );
+
+        if (!$user->tenants()->where('tenants.id', $tenantId)->exists()) {
+            $user->tenants()->attach($tenantId, [
+                'role_id' => $customerRole->id,
+                'current_tenant' => true,
+                'status' => 'active',
+            ]);
+        }
+
+        DB::table('model_has_roles')->updateOrInsert(
+            [
+                'role_id' => $customerRole->id,
+                'model_type' => User::class,
+                'model_id' => $user->id,
+                'tenant_id' => $tenantId,
+            ],
+            []
+        );
     }
 }

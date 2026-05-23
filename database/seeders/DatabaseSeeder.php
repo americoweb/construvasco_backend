@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             TenantSeeder::class,
             TenantUserSeeder::class,
             ConstructionProjectSeeder::class,
+            DemoFlowSeeder::class,
         ]);
 
         $cliente = User::where('identifier', 'cliente@construvasco.co.mz')->first();

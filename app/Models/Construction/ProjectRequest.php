@@ -26,13 +26,14 @@ class ProjectRequest extends Model
         'user_id', 'reference_code', 'project_type', 'tipologia', 'title', 'description',
         'area_m2', 'largura_m', 'comprimento_m', 'num_pisos', 'num_quartos',
         'orcamento_estimado_mt', 'prazo_desejado', 'localizacao', 'estilo_arquitectonico',
-        'paleta_acabamento', 'zona_prioritaria', 'whatsapp', 'observacoes', 'reference_files',
+        'paleta_acabamento', 'zona_prioritaria', 'whatsapp', 'observacoes', 'briefing_data', 'reference_files',
         'approved_ai_generation_id', 'status', 'submitted_at', 'reviewed_at', 'converted_project_id',
     ];
 
     protected $casts = [
         'status' => ProjectRequestStatus::class,
         'reference_files' => 'array',
+        'briefing_data' => 'array',
         'prazo_desejado' => 'date',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',

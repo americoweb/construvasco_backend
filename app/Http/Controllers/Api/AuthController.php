@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Http\Resources\TenantResource;
+use App\Models\Settings\Tenant;
+use App\Models\TenantInvitation;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\Credits\CreditService;
+use App\Services\TenantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -25,7 +28,13 @@ class AuthController extends Controller
         private CreditService $creditService
     )
     {
-        $this->middleware('auth:api', ['except' => ['login', 'register', 'googleLogin']]);
+        $this->middleware('auth:api', ['except' => [
+            'login',
+            'register',
+            'googleLogin',
+            'validateInvitation',
+            'validateCompanyInvitation',
+        ]]);
     }
 
     public function login(Request $request): JsonResponse
@@ -97,8 +106,9 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type' => 'bearer',
             'expires_in' => JWTAuth::factory()->getTTL() * 60,
+            'must_change' => (bool) $user->must_change,
             'user' => new UserResource($user),
-            'current_tenant' => $user->getCurrentTenant() ? 
+            'current_tenant' => $user->getCurrentTenant() ?
                 new TenantResource($user->getCurrentTenant()) : null,
         ]);
     }
@@ -111,6 +121,8 @@ class AuthController extends Controller
             'email' => 'nullable|string|max:255',
             'type' => 'nullable|in:email,whatsapp',
             'password' => 'required|string|min:8|confirmed',
+            'invitation_token' => 'nullable|string',
+            'company_name' => 'nullable|string|max:255',
         ]);
 
         $raw = $request->input('identifier') ?: $request->input('email');
@@ -149,46 +161,27 @@ class AuthController extends Controller
                     'is_active' => true,
                 ]);
 
-                $tenantId = 1;
-                $customerRole = Role::where('name', 'customer')->where('guard_name', 'api')->first();
-                if (!$customerRole) {
-                    $customerRole = Role::create([
-                        'name' => 'customer',
-                        'guard_name' => 'api',
-                        'display_name' => 'Customer',
-                        'description' => 'Customer access',
-                        'is_system' => true,
-                    ]);
+                $invitationAccepted = $this->processRegistrationInvitation($request, $user, $identifier);
+
+                if (!$invitationAccepted) {
+                    $this->attachDefaultCustomerTenant($user);
+                    $this->creditService->grantInitialCredits($user);
                 }
 
-                $user->tenants()->attach($tenantId, [
-                    'role_id' => $customerRole->id,
-                    'current_tenant' => true,
-                    'status' => 'active',
-                ]);
-                $user->switchTenant($tenantId);
-
-                DB::table('model_has_roles')->updateOrInsert(
-                    [
-                        'role_id' => $customerRole->id,
-                        'model_type' => get_class($user),
-                        'model_id' => $user->id,
-                        'tenant_id' => $tenantId,
-                    ],
-                    []
-                );
-
+                $user->refresh();
                 $token = JWTAuth::fromUser($user);
-                $this->creditService->grantInitialCredits($user);
                 $this->activityLogService->logUserAction('user_registered', $user);
 
                 return response()->json([
                     'access_token' => $token,
                     'token_type' => 'bearer',
                     'expires_in' => JWTAuth::factory()->getTTL() * 60,
+                    'must_change' => false,
                     'user' => new UserResource($user),
                     'current_tenant' => $user->getCurrentTenant() ? new TenantResource($user->getCurrentTenant()) : null,
-                    'message' => 'Registration successful'
+                    'message' => $invitationAccepted
+                        ? 'Registration successful — invitation accepted'
+                        : 'Registration successful',
                 ], 201);
             });
 
@@ -265,11 +258,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Google OAuth Login/Sign-up
-     * Simplified version: all users are customers on tenant_id = 1
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Google OAuth Login/Sign-up — tenant resolvido via pivot do utilizador (slug construvasco para novos clientes).
      */
     public function googleLogin(Request $request): JsonResponse
     {
@@ -358,155 +347,60 @@ class AuthController extends Controller
                 ], 400);
             }
 
-            return DB::transaction(function () use ($googleId, $email, $name, $picture) {
-                // Check if user exists by google_id or email
+            return DB::transaction(function () use ($googleId, $email, $name) {
                 $user = User::where('google_id', $googleId)
                     ->orWhere('identifier', $email)
                     ->first();
 
-                $isNewUser = !$user;
-                $tenantId = 1; // Always use tenant 1
+                $isNewUser = ! $user;
 
                 if ($isNewUser) {
-                    // NEW USER - Create with tenant_id = 1, role = customer
                     Log::info('New Google user detected, creating account', ['email' => $email]);
 
-                    // Check if email is already registered
                     if (User::where('identifier', $email)->exists()) {
-                        Log::warning('Email already registered', ['email' => $email]);
                         return response()->json([
                             'error' => 'This email is already registered. Please sign in instead.',
-                            'error_code' => 'EMAIL_EXISTS'
+                            'error_code' => 'EMAIL_EXISTS',
                         ], 422);
                     }
 
-                    // Create the user
                     $user = User::create([
                         'name' => $name ?? 'User',
                         'identifier' => $email,
                         'type' => 'email',
-                        'password' => Hash::make(\Illuminate\Support\Str::random(32)), // Random password since Google auth is used
+                        'password' => Hash::make(\Illuminate\Support\Str::random(32)),
                         'google_id' => $googleId,
-                        'verified_at' => now(), // Google-verified emails are pre-verified
+                        'verified_at' => now(),
                         'is_active' => true,
                     ]);
 
-                    Log::info('User created successfully', ['user_id' => $user->id, 'name' => $user->name]);
-
-                    // Attach user to tenant 1 with customer role
-                    $customerRole = Role::where('name', 'customer')->where('guard_name', 'api')->first();
-                    
-                    // Create customer role if it doesn't exist
-                    if (!$customerRole) {
-                        Log::warning('Customer role not found, creating it', ['user_id' => $user->id]);
-                        $customerRole = Role::create([
-                            'name' => 'customer',
-                            'guard_name' => 'api',
-                            'display_name' => 'Customer',
-                            'description' => 'Customer access for e-commerce platform',
-                            'is_system' => true,
-                        ]);
-                        Log::info('Customer role created', ['role_id' => $customerRole->id]);
-                    }
-
-                    // Attach user to tenant 1
-                    $user->tenants()->attach($tenantId, [
-                        'role_id' => $customerRole->id,
-                        'current_tenant' => true,
-                        'status' => 'active'
-                    ]);
-
-                    // Set tenant in session before assigning role (required for Spatie Permission with teams)
-                    session(['tenant_id' => $tenantId]);
-
-                    // Assign customer role to user with tenant context
-                    // Use direct DB insert to ensure tenant_id is set (Spatie Permission with teams)
-                    DB::table('model_has_roles')->insert([
-                        'role_id' => $customerRole->id,
-                        'model_type' => get_class($user),
-                        'model_id' => $user->id,
-                        'tenant_id' => $tenantId,
-                    ]);
-
-                    Log::info('User attached to tenant 1 as customer', [
-                        'user_id' => $user->id,
-                        'tenant_id' => $tenantId,
-                        'role_id' => $customerRole->id
-                    ]);
+                    $this->attachDefaultCustomerTenant($user);
+                    $this->creditService->grantInitialCredits($user);
                 } else {
-                    // EXISTING USER - Login flow
                     Log::info('Existing Google user detected, logging in', ['user_id' => $user->id, 'email' => $email]);
 
-                    // Update google_id if not set
-                    if (!$user->google_id) {
+                    if (! $user->google_id) {
                         $user->google_id = $googleId;
                         $user->save();
-                        Log::info('Updated user with google_id', ['user_id' => $user->id]);
                     }
 
-                    // Ensure user is attached to tenant 1
-                    if (!$user->tenants()->where('tenants.id', $tenantId)->exists()) {
-                        $customerRole = Role::where('name', 'customer')->where('guard_name', 'api')->first();
-                        
-                        // Create customer role if it doesn't exist
-                        if (!$customerRole) {
-                            Log::warning('Customer role not found, creating it', ['user_id' => $user->id]);
-                            $customerRole = Role::create([
-                                'name' => 'customer',
-                                'guard_name' => 'api',
-                                'display_name' => 'Customer',
-                                'description' => 'Customer access for e-commerce platform',
-                                'is_system' => true,
-                            ]);
-                            Log::info('Customer role created', ['role_id' => $customerRole->id]);
-                        }
-
-                        $user->tenants()->attach($tenantId, [
-                            'role_id' => $customerRole->id,
-                            'current_tenant' => true,
-                            'status' => 'active'
-                        ]);
-
-                        // Set tenant in session before assigning role (required for Spatie Permission with teams)
-                        session(['tenant_id' => $tenantId]);
-
-                        // Assign customer role if not already assigned
-                        if (!$user->hasRole('customer')) {
-                            // Use direct DB insert to ensure tenant_id is set (Spatie Permission with teams)
-                            DB::table('model_has_roles')->insert([
-                                'role_id' => $customerRole->id,
-                                'model_type' => get_class($user),
-                                'model_id' => $user->id,
-                                'tenant_id' => $tenantId,
-                            ]);
-                        }
-                    } else {
-                        // Set tenant 1 as current tenant
-                        $user->tenants()->updateExistingPivot($tenantId, ['current_tenant' => true]);
-                    }
-
-                    // Set tenant in session
-                    session(['tenant_id' => $tenantId]);
-                    Log::info('Tenant 1 set in session for existing user', ['tenant_id' => $tenantId]);
+                    $this->ensureCustomerHasTenant($user);
                 }
 
-                // Update last login
                 $user->updateLastLogin();
-
-                // Generate JWT token
                 $token = JWTAuth::fromUser($user);
-                Log::info('JWT token generated for Google user', ['user_id' => $user->id]);
-
                 $this->activityLogService->logUserAction($isNewUser ? 'user_registered' : 'user_logged_in', $user);
 
                 return response()->json([
                     'access_token' => $token,
                     'token_type' => 'bearer',
                     'expires_in' => JWTAuth::factory()->getTTL() * 60,
-                    'user' => new UserResource($user),
-                    'current_tenant' => $user->getCurrentTenant() ? 
-                        new TenantResource($user->getCurrentTenant()) : null,
-                    'message' => $isNewUser ? 'User registered successfully with Google.' : 'User authenticated successfully with Google.'
+                    'must_change' => (bool) $user->must_change,
+                    'user' => new UserResource($user->fresh()),
+                    'current_tenant' => $user->getCurrentTenant()
+                        ? new TenantResource($user->getCurrentTenant())
+                        : null,
+                    'message' => $isNewUser ? 'User registered successfully with Google.' : 'User authenticated successfully with Google.',
                 ], $isNewUser ? 201 : 200)->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
                     ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
             });
@@ -531,5 +425,198 @@ class AuthController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function validateInvitation(Request $request): JsonResponse
+    {
+        $request->validate(['token' => 'required|string']);
+
+        $invitation = TenantInvitation::where('token', $request->get('token'))
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$invitation) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid or expired invitation token',
+            ], 404);
+        }
+
+        $tenant = Tenant::find($invitation->tenant_id);
+
+        return response()->json([
+            'valid' => true,
+            'invitation' => [
+                'id' => $invitation->id,
+                'identifier' => $invitation->identifier,
+                'type' => $invitation->type,
+                'role' => $invitation->role,
+                'tenant' => $tenant ? [
+                    'id' => $tenant->id,
+                    'name' => $tenant->name,
+                    'slug' => $tenant->slug,
+                ] : null,
+            ],
+        ]);
+    }
+
+    public function validateCompanyInvitation(Request $request): JsonResponse
+    {
+        $request->validate(['company_name' => 'required|string']);
+
+        $tenant = Tenant::where('name', $request->get('company_name'))
+            ->where('is_active', true)
+            ->first();
+
+        if (!$tenant) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Company not found',
+            ], 404);
+        }
+
+        $company = [
+            'id' => $tenant->id,
+            'name' => $tenant->name,
+            'slug' => $tenant->slug,
+        ];
+
+        return response()->json([
+            'valid' => true,
+            'tenant' => $company,
+            'company' => $company,
+        ]);
+    }
+
+    private function processRegistrationInvitation(Request $request, User $user, string $identifier): bool
+    {
+        if ($request->filled('invitation_token')) {
+            $invitation = TenantInvitation::where('token', $request->get('invitation_token'))
+                ->where('status', 'pending')
+                ->first();
+
+            if ($invitation) {
+                $tenant = Tenant::find($invitation->tenant_id);
+                if ($tenant) {
+                    $this->acceptInvitation($invitation, $tenant, $user);
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if ($request->filled('company_name')) {
+            $tenant = Tenant::where('name', $request->get('company_name'))
+                ->where('is_active', true)
+                ->first();
+
+            if ($tenant) {
+                $invitation = TenantInvitation::where('identifier', $identifier)
+                    ->where('tenant_id', $tenant->id)
+                    ->where('status', 'pending')
+                    ->first();
+
+                if ($invitation) {
+                    $this->acceptInvitation($invitation, $tenant, $user);
+
+                    return true;
+                }
+            }
+        } else {
+            $invitation = TenantInvitation::where('identifier', $identifier)
+                ->where('status', 'pending')
+                ->first();
+
+            if ($invitation) {
+                $tenant = Tenant::find($invitation->tenant_id);
+                if ($tenant) {
+                    $this->acceptInvitation($invitation, $tenant, $user);
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function acceptInvitation(TenantInvitation $invitation, Tenant $tenant, User $user): void
+    {
+        app(TenantService::class)->addUserToTenant(
+            $tenant,
+            $user,
+            $invitation->role,
+            true,
+            []
+        );
+
+        $invitation->update([
+            'status' => 'accepted',
+            'accepted_at' => now(),
+        ]);
+
+        $user->switchTenant($tenant->id);
+    }
+
+    private function attachDefaultCustomerTenant(User $user): void
+    {
+        $tenant = Tenant::where('slug', 'construvasco')->where('is_active', true)->first();
+        if (! $tenant) {
+            $tenant = Tenant::where('is_active', true)->orderBy('id')->first();
+        }
+        if (! $tenant) {
+            throw new \RuntimeException('Nenhum tenant activo encontrado para registo de cliente.');
+        }
+
+        $tenantId = $tenant->id;
+        $customerRole = Role::where('name', 'customer')->where('guard_name', 'api')->first();
+        if (! $customerRole) {
+            $customerRole = Role::create([
+                'name' => 'customer',
+                'guard_name' => 'api',
+                'display_name' => 'Customer',
+                'description' => 'Customer access',
+                'is_system' => true,
+            ]);
+        }
+
+        if (! $user->tenants()->where('tenants.id', $tenantId)->exists()) {
+            $user->tenants()->attach($tenantId, [
+                'role_id' => $customerRole->id,
+                'current_tenant' => true,
+                'status' => 'active',
+            ]);
+        } else {
+            $user->tenants()->updateExistingPivot($tenantId, ['current_tenant' => true]);
+        }
+
+        $user->switchTenant($tenantId);
+
+        DB::table('model_has_roles')->updateOrInsert(
+            [
+                'role_id' => $customerRole->id,
+                'model_type' => get_class($user),
+                'model_id' => $user->id,
+                'tenant_id' => $tenantId,
+            ],
+            []
+        );
+    }
+
+    private function ensureCustomerHasTenant(User $user): void
+    {
+        if ($user->tenants()->exists()) {
+            $current = $user->tenants()->wherePivot('current_tenant', true)->first()
+                ?? $user->tenants()->first();
+            if ($current) {
+                $user->switchTenant($current->id);
+            }
+
+            return;
+        }
+
+        $this->attachDefaultCustomerTenant($user);
     }
 }

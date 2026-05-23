@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Constants\NotificationTypes;
 use App\Enums\ProjectRequestStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\BriefingDataRules;
 use App\Models\AI\AiGeneration;
 use App\Models\Construction\ProjectDocument;
 use App\Models\Construction\ProjectRequest;
@@ -20,6 +21,7 @@ class CustomerProjectRequestController extends Controller
     public function index(Request $request): JsonResponse
     {
         $items = ProjectRequest::where('user_id', $request->user()->id)
+            ->with('quotes')
             ->latest()
             ->paginate(15);
 
@@ -158,7 +160,7 @@ class CustomerProjectRequestController extends Controller
             'whatsapp' => 'nullable|string|max:30',
             'observacoes' => 'nullable|string',
             'reference_files' => 'nullable|array',
-        ]);
+        ], BriefingDataRules::rules());
     }
 
     private function nextReference(): string

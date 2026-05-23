@@ -13,7 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->api(prepend: [
+        // After auth:api so tenant/team context uses the authenticated user.
+        $middleware->api(append: [
             \App\Http\Middleware\SetApiTenantContext::class,
         ]);
 

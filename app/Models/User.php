@@ -16,8 +16,6 @@ class User extends Authenticatable implements JWTSubject
     use HasFactory, Notifiable, HasRoles, TenantPermission {
         TenantPermission::hasPermissionTo insteadof HasRoles;
         HasRoles::hasPermissionTo as hasRolePermissionTo;
-        TenantPermission::hasRole insteadof HasRoles;
-        TenantPermission::hasAnyRole insteadof HasRoles;
         HasRoles::hasRole as hasRoleBase;
         HasRoles::hasAnyRole as hasAnyRoleBase;
     }
@@ -159,5 +157,38 @@ class User extends Authenticatable implements JWTSubject
     public function setSettingsArray(array $settings): void
     {
         $this->settings = $settings;
+    }
+
+    /**
+     * Spatie RoleMiddleware + tenant pivot roles (hasRoleBase is Spatie HasRoles).
+     */
+    public function hasRole($roles, ?string $guard = null): bool
+    {
+        $guard = $guard ?? 'api';
+
+        if ($this->getCurrentTenantId() && $this->hasTenantRole($roles)) {
+            return true;
+        }
+
+        $tenantId = $this->getCurrentTenantId();
+        if ($tenantId) {
+            app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId($tenantId);
+        }
+
+        return $this->hasRoleBase($roles, $guard);
+    }
+
+    public function hasAnyRole($roles, ?string $guard = null): bool
+    {
+        $guard = $guard ?? 'api';
+        $roles = is_array($roles) ? $roles : explode('|', (string) $roles);
+
+        foreach ($roles as $role) {
+            if ($this->hasRole($role, $guard)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

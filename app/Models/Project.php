@@ -100,7 +100,8 @@ class Project extends Model
         return (int) round(($done / $total) * 100);
     }
 
-    public function getCurrentPhaseAttribute(): ?ProjectMilestone
+    /** Marco técnico activo (não confundir com coluna DB current_phase). */
+    public function getActiveMilestoneAttribute(): ?ProjectMilestone
     {
         return $this->milestones()
             ->whereIn('status', ['in_progress', 'pending'])

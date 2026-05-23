@@ -9,17 +9,25 @@ use App\Http\Controllers\Admin\AdminStaffController;
 use App\Http\Controllers\Manager\ManagerProjectController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->middleware(['auth:api', 'role:admin,api'])->group(function () {
-    Route::get('admin/dashboard', [AdminDashboardController::class, 'index']);
+Route::prefix('v1')->middleware(['auth:api'])->group(function () {
+    // Painel e projectos: equipa interna (não cliente).
+    Route::middleware(['role:admin|project_manager|technician,api'])->group(function () {
+        Route::get('admin/dashboard', [AdminDashboardController::class, 'index']);
+        Route::get('admin/projects', [ManagerProjectController::class, 'index']);
+        Route::patch('admin/projects/{id}/assign', [ManagerProjectController::class, 'assign']);
+    });
 
-    Route::get('admin/clients/search', [AdminClientController::class, 'search']);
-    Route::post('admin/clients', [AdminClientController::class, 'store']);
+    // Clientes e pedidos em nome do cliente: admin + gestor.
+    Route::middleware(['role:admin|project_manager,api'])->group(function () {
+        Route::get('admin/clients/search', [AdminClientController::class, 'search']);
+        Route::post('admin/clients', [AdminClientController::class, 'store']);
+    });
+
+    // Configuração e relatórios: só administrador.
+    Route::middleware(['role:admin,api'])->group(function () {
 
     Route::get('admin/staff/designers', [AdminStaffController::class, 'designers']);
     Route::apiResource('admin/staff', AdminStaffController::class);
-
-    Route::get('admin/projects', [ManagerProjectController::class, 'index']);
-    Route::patch('admin/projects/{id}/assign', [ManagerProjectController::class, 'assign']);
 
     Route::get('admin/project-templates', [AdminProjectTemplateController::class, 'index']);
     Route::post('admin/project-templates', [AdminProjectTemplateController::class, 'store']);
@@ -35,4 +43,5 @@ Route::prefix('v1')->middleware(['auth:api', 'role:admin,api'])->group(function 
 
     Route::get('admin/reports/financial', [AdminReportController::class, 'financial']);
     Route::get('admin/reports/operational', [AdminReportController::class, 'operational']);
+    });
 });

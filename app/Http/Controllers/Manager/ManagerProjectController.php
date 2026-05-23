@@ -19,8 +19,19 @@ class ManagerProjectController extends Controller
         private NotificationService $notifications
     ) {}
 
+    public function assignableUsers(): JsonResponse
+    {
+        $users = \App\Models\User::role(['technician', 'project_manager'], 'api')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'identifier']);
+
+        return response()->json(['data' => $users]);
+    }
+
     public function index(): JsonResponse
     {
+        // TODO multi-tenant: filtrar por tenant_id do utilizador autenticado quando multi-tenant estiver activo.
         $projects = Project::with(['client', 'milestones', 'assignments.assignedUser'])
             ->latest()
             ->paginate(30);

@@ -46,7 +46,7 @@ class TenantUserSeeder extends Seeder
                 'user_id' => $projectManager->id,
                 'role_id' => $projectManagerRole->id,
                 'permissions' => json_encode(['projects.*', 'assignments.*']),
-                'current_tenant' => false,
+                'current_tenant' => true,
                 'status' => 'active',
             ],
             [
@@ -54,7 +54,7 @@ class TenantUserSeeder extends Seeder
                 'user_id' => $technician->id,
                 'role_id' => $technicianRole->id,
                 'permissions' => json_encode(['projects.view', 'deliverables.*']),
-                'current_tenant' => false,
+                'current_tenant' => true,
                 'status' => 'active',
             ],
             [
