@@ -33,6 +33,7 @@ class ProjectPayment extends Model
         'status',
         'paid_at',
         'metadata',
+        'notes',
         'proof_path',
         'proof_uploaded_at',
         'confirmed_by',

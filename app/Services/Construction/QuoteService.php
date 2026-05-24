@@ -25,6 +25,7 @@ class QuoteService
         private ProjectTemplateService $templateService,
         private NotificationService $notifications,
         private EmailDispatcher $emails,
+        private PaymentService $payments,
     ) {}
 
     public function assertCanCreateQuote(ProjectRequest $request, QuoteType $type): void
@@ -215,6 +216,12 @@ class QuoteService
                 $quote->id,
             );
         }
+
+        $this->payments->createArchitecturePayment(
+            $project,
+            $customer,
+            (float) $quote->total_amount_mt
+        );
 
         return $project->load('milestones');
     }

@@ -37,6 +37,7 @@ class DeliverableService
         private FileStorageService $storage,
         private NotificationService $notifications,
         private EmailDispatcher $emails,
+        private PaymentService $payments,
     ) {}
 
     public function upload(
@@ -238,6 +239,11 @@ class DeliverableService
         if ($role === 'customer') {
             abort_unless($project->client_user_id === $user->id, 403);
             abort_unless($deliverable->status === DeliverableStatus::Approved->value, 403, 'Entregável ainda não aprovado.');
+            abort_unless(
+                $this->payments->isArchitecturePaymentConfirmed($project),
+                403,
+                'Pagamento da fase de arquitectura ainda não confirmado.'
+            );
 
             activity('deliverables')
                 ->performedOn($deliverable)

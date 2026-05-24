@@ -37,4 +37,5 @@ Route::prefix('v1/customer')->middleware(['auth:api', 'role:customer,api'])->gro
     Route::post('projects/{id}/pay-final', [CustomerProjectController::class, 'payFinal']);
     Route::get('projects/{id}/deliverables', [CustomerProjectController::class, 'deliverables']);
     Route::get('projects/{id}/deliverables/{deliverableId}/download', [CustomerProjectController::class, 'downloadDeliverable']);
+    Route::post('projects/{id}/payments/{paymentId}/proof', [CustomerProjectController::class, 'uploadPaymentProof']);
 });
