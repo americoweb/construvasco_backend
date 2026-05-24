@@ -126,15 +126,14 @@ class DemoFlowSeeder extends Seeder
             [
                 'project_request_id' => $acceptedRequest->id,
                 'quote_type' => QuoteType::Architecture,
-                'status' => QuoteStatus::Accepted,
             ],
             [
                 'created_by_user_id' => $gestor->id,
+                'status' => QuoteStatus::Sent,
                 'total_amount_mt' => 850000,
                 'delivery_days' => 60,
                 'conditions' => 'Demo — projecto em arquitectura.',
                 'sent_at' => now()->subDays(8),
-                'responded_at' => now()->subDays(7),
             ]
         );
 
@@ -143,6 +142,13 @@ class DemoFlowSeeder extends Seeder
             ->exists();
 
         if (! $projectExists) {
+            if ($acceptedQuote->status !== QuoteStatus::Sent) {
+                $acceptedQuote->update([
+                    'status' => QuoteStatus::Sent,
+                    'responded_at' => null,
+                ]);
+                $acceptedQuote->refresh();
+            }
             app(QuoteService::class)->accept($acceptedQuote, $cliente);
         }
 
