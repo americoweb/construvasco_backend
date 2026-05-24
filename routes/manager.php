@@ -22,6 +22,11 @@ Route::prefix('v1/manager')->middleware(['auth:api', 'role:project_manager|admin
     Route::get('projects', [ManagerProjectController::class, 'index']);
     Route::get('projects/{id}', [ManagerProjectController::class, 'show']);
     Route::post('projects/{id}/assign', [ManagerProjectController::class, 'assign']);
+    Route::get('projects/{id}/deliverables', [ManagerProjectController::class, 'listDeliverables']);
+    Route::post('projects/{id}/deliverables/{deliverableId}/approve', [ManagerProjectController::class, 'approveDeliverable']);
+    Route::post('projects/{id}/deliverables/{deliverableId}/reject', [ManagerProjectController::class, 'rejectDeliverable']);
+    Route::get('projects/{id}/deliverables/{deliverableId}/download', [ManagerProjectController::class, 'downloadDeliverable']);
+    Route::post('projects/{id}/mark-architecture-delivered', [ManagerProjectController::class, 'markArchitectureDelivered']);
     Route::post('projects/{id}/phases', [ManagerProjectController::class, 'addPhase']);
     Route::post('projects/{id}/approve-deliverables', [ManagerProjectController::class, 'approveDeliverables']);
     Route::post('projects/{id}/reject-deliverables', [ManagerProjectController::class, 'rejectDeliverables']);

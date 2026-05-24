@@ -8,6 +8,9 @@ Route::prefix('v1/technician')->middleware(['auth:api', 'role:technician|admin,a
     Route::get('dashboard', TechnicianDashboardController::class);
     Route::get('projects', [TechnicianProjectController::class, 'index']);
     Route::get('projects/{id}', [TechnicianProjectController::class, 'show']);
+    Route::get('projects/{id}/deliverables', [TechnicianProjectController::class, 'listDeliverables']);
+    Route::post('projects/{id}/deliverables', [TechnicianProjectController::class, 'storeDeliverable']);
+    Route::get('projects/{id}/deliverables/{deliverableId}/download', [TechnicianProjectController::class, 'downloadDeliverable']);
     Route::patch('projects/{id}/phases/{phaseId}', [TechnicianProjectController::class, 'updatePhase']);
     Route::post('projects/{id}/phases/{phaseId}/deliverables', [TechnicianProjectController::class, 'uploadDeliverable']);
     Route::delete('deliverables/{id}', [TechnicianProjectController::class, 'destroyDeliverable']);

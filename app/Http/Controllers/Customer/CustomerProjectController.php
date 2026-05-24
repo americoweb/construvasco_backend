@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Enums\ProjectPaymentType;
+use App\Http\Controllers\Concerns\LoadsProjectWithBriefing;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProjectDeliverableResource;
 use App\Models\Construction\ProjectPayment;
 use App\Models\Construction\ProjectDeliverable;
 use App\Models\Project;
+use App\Services\Construction\DeliverableService;
 use App\Services\Storage\FileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +17,10 @@ use Illuminate\Support\Str;
 
 class CustomerProjectController extends Controller
 {
+    use LoadsProjectWithBriefing;
+
+    public function __construct(private DeliverableService $deliverables) {}
+
     public function index(Request $request): JsonResponse
     {
         $items = Project::where('client_user_id', $request->user()->id)
@@ -27,10 +34,11 @@ class CustomerProjectController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $project = Project::where('client_user_id', $request->user()->id)
-            ->with(['milestones', 'deliverables', 'quote'])
             ->findOrFail($id);
 
-        return response()->json(['data' => $project]);
+        $project = $this->projectWithBriefing($project->id);
+
+        return response()->json(['data' => $this->projectPayload($project)]);
     }
 
     public function payFinal(Request $request, int $id): JsonResponse
@@ -54,32 +62,21 @@ class CustomerProjectController extends Controller
 
     public function deliverables(Request $request, int $id): JsonResponse
     {
-        $project = Project::where('client_user_id', $request->user()->id)
-            ->with('deliverables')
-            ->findOrFail($id);
+        $project = Project::where('client_user_id', $request->user()->id)->findOrFail($id);
+        $items = $this->deliverables->listForCustomer($project);
 
-        if (!$project->client_can_download) {
-            return response()->json([
-                'message' => 'Pagamento pendente. Conclua o pagamento para descarregar.',
-                'preview_only' => true,
-                'data' => $project->deliverables->map(fn ($d) => [
-                    'id' => $d->id,
-                    'title' => $d->title,
-                    'deliverable_type' => $d->deliverable_type,
-                    'status' => $d->status,
-                ]),
-            ]);
-        }
-
-        return response()->json(['data' => $project->deliverables]);
+        return response()->json(['data' => ProjectDeliverableResource::collection($items)]);
     }
 
-    public function downloadDeliverable(Request $request, int $id, int $deliverableId, FileStorageService $storage)
-    {
+    public function downloadDeliverable(
+        Request $request,
+        int $id,
+        int $deliverableId,
+        FileStorageService $storage,
+    ) {
         $project = Project::where('client_user_id', $request->user()->id)->findOrFail($id);
-        abort_unless($project->client_can_download, 403, 'Pagamento pendente.');
-
         $deliverable = ProjectDeliverable::where('project_id', $project->id)->findOrFail($deliverableId);
+        $this->deliverables->authorizeDownload($project, $deliverable, $request->user(), 'customer');
 
         return $storage->streamDownload(
             $deliverable->file_path,

@@ -3,20 +3,30 @@
 namespace App\Http\Controllers\Manager;
 
 use App\Constants\NotificationTypes;
+use App\Enums\DeliverableStatus;
+use App\Http\Controllers\Concerns\LoadsProjectWithBriefing;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProjectDeliverableResource;
 use App\Models\Construction\ProjectAssignment;
+use App\Models\Construction\ProjectDeliverable;
 use App\Models\Construction\ProjectMilestone;
 use App\Models\Project;
+use App\Services\Construction\DeliverableService;
 use App\Services\Construction\ProjectFlowService;
 use App\Services\Notifications\NotificationService;
+use App\Services\Storage\FileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ManagerProjectController extends Controller
 {
+    use LoadsProjectWithBriefing;
+
     public function __construct(
         private ProjectFlowService $flow,
-        private NotificationService $notifications
+        private NotificationService $notifications,
+        private DeliverableService $deliverables,
+        private FileStorageService $storage,
     ) {}
 
     public function assignableUsers(): JsonResponse
@@ -31,8 +41,13 @@ class ManagerProjectController extends Controller
 
     public function index(): JsonResponse
     {
-        // TODO multi-tenant: filtrar por tenant_id do utilizador autenticado quando multi-tenant estiver activo.
         $projects = Project::with(['client', 'milestones', 'assignments.assignedUser'])
+            ->withCount([
+                'deliverables as pending_review_count' => fn ($q) => $q->whereIn(
+                    'status',
+                    DeliverableStatus::pendingReviewValues()
+                ),
+            ])
             ->latest()
             ->paginate(30);
 
@@ -41,10 +56,9 @@ class ManagerProjectController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $project = Project::with(['milestones', 'deliverables', 'assignments.assignedUser', 'client'])
-            ->findOrFail($id);
+        $project = $this->projectWithBriefing($id);
 
-        return response()->json(['data' => $project]);
+        return response()->json(['data' => $this->projectPayload($project)]);
     }
 
     public function assign(Request $request, int $id): JsonResponse
@@ -59,6 +73,63 @@ class ManagerProjectController extends Controller
         $assignment->update(['assignment_role' => $validated['assignment_role'] ?? 'main']);
 
         return response()->json(['data' => $assignment]);
+    }
+
+    public function listDeliverables(int $id): JsonResponse
+    {
+        $project = Project::findOrFail($id);
+        $items = $this->deliverables->listForManager($project);
+
+        return response()->json(['data' => ProjectDeliverableResource::collection($items)]);
+    }
+
+    public function approveDeliverable(int $id, int $deliverableId, Request $request): JsonResponse
+    {
+        $project = Project::findOrFail($id);
+        $deliverable = ProjectDeliverable::where('project_id', $project->id)->findOrFail($deliverableId);
+        $deliverable = $this->deliverables->approve($project, $deliverable, $request->user());
+
+        return response()->json(['data' => new ProjectDeliverableResource($deliverable)]);
+    }
+
+    public function rejectDeliverable(Request $request, int $id, int $deliverableId): JsonResponse
+    {
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|min:10|max:2000',
+        ]);
+
+        $project = Project::findOrFail($id);
+        $deliverable = ProjectDeliverable::where('project_id', $project->id)->findOrFail($deliverableId);
+        $deliverable = $this->deliverables->reject(
+            $project,
+            $deliverable,
+            $request->user(),
+            $validated['rejection_reason'],
+        );
+
+        return response()->json(['data' => new ProjectDeliverableResource($deliverable)]);
+    }
+
+    public function downloadDeliverable(Request $request, int $id, int $deliverableId)
+    {
+        $project = Project::findOrFail($id);
+        $deliverable = ProjectDeliverable::where('project_id', $project->id)->findOrFail($deliverableId);
+        $role = $request->user()->getRoleNames()->first() ?? 'project_manager';
+        $this->deliverables->authorizeDownload($project, $deliverable, $request->user(), $role);
+
+        return $this->storage->streamDownload(
+            $deliverable->file_path,
+            $deliverable->file_disk ?? config('filesystems.deliverables_disk', 'local'),
+            $deliverable->original_name ?? $deliverable->title
+        );
+    }
+
+    public function markArchitectureDelivered(Request $request, int $id): JsonResponse
+    {
+        $project = Project::findOrFail($id);
+        $project = $this->deliverables->markArchitectureDelivered($project, $request->user());
+
+        return response()->json(['data' => $project]);
     }
 
     public function addPhase(Request $request, int $id): JsonResponse
@@ -82,6 +153,7 @@ class ManagerProjectController extends Controller
         return response()->json(['data' => $milestone], 201);
     }
 
+    /** @deprecated Bloco 3B usa aprovação por entregável */
     public function approveDeliverables(int $id): JsonResponse
     {
         $project = Project::with('client')->findOrFail($id);
@@ -97,6 +169,7 @@ class ManagerProjectController extends Controller
         return response()->json(['data' => $project->fresh()]);
     }
 
+    /** @deprecated Bloco 3B usa rejeição por entregável */
     public function rejectDeliverables(Request $request, int $id): JsonResponse
     {
         $project = Project::findOrFail($id);
