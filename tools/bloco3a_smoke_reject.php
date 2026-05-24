@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * Validação flow recusa: quote_rejected + email quote_rejected + reenvio orçamento.
+ */
 require __DIR__ . '/../vendor/autoload.php';
 $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
@@ -17,11 +20,23 @@ $api = $base . '/api';
 
 function login(string $api, string $email, string $password): string
 {
-    $res = Http::post("{$api}/auth/login", ['identifier' => $email, 'password' => $password]);
+    $res = Http::acceptJson()->post("{$api}/auth/login", [
+        'identifier' => $email,
+        'password' => $password,
+    ]);
     if (! $res->successful()) {
         throw new RuntimeException('Login failed: ' . $res->body());
     }
+
     return $res->json('access_token') ?? $res->json('data.token') ?? $res->json('token');
+}
+
+function ok(bool $cond, string $label): void
+{
+    echo ($cond ? '✅' : '❌') . " {$label}\n";
+    if (! $cond) {
+        exit(1);
+    }
 }
 
 $gestor = login($api, 'gestor@construvasco.co.mz', 'Gestor@2026');
@@ -38,37 +53,50 @@ $pr = ProjectRequest::create([
     'tipologia' => 't3',
 ]);
 
-$quoteRes = Http::withToken($gestor)->post("{$api}/v1/manager/project-requests/{$pr->id}/quotes", [
+$quoteRes = Http::acceptJson()->withToken($gestor)->post("{$api}/v1/manager/project-requests/{$pr->id}/quotes", [
     'total_amount_mt' => 50000,
     'delivery_days' => 20,
 ]);
+ok($quoteRes->successful(), 'Gestor envia 1.º orçamento');
 $quoteId = $quoteRes->json('data.id');
 
-$reject = Http::withToken($cliente)->post("{$api}/v1/customer/quotes/{$quoteId}/reject", [
-    'reason' => 'Valor acima do orçamento disponível',
+$emailsBefore = DB::table('email_dispatches')->where('event_type', 'quote_rejected')->count();
+
+$reject = Http::acceptJson()->withToken($cliente)->post("{$api}/v1/customer/quotes/{$quoteId}/reject", [
+    'reason' => 'Valor acima do orçamento previsto',
 ]);
-if (! $reject->successful()) {
-    echo "Reject failed: " . $reject->body() . "\n";
-    exit(1);
-}
+ok($reject->successful(), 'Cliente recusa orçamento');
 
 $quote = Quote::find($quoteId);
-$projectCount = Project::withoutGlobalScopes()->where('project_request_id', $pr->id)->count();
-$acceptedEmail = DB::table('email_dispatches')->where('event_type', 'quote_accepted')
-    ->where('related_entity_id', (string) $quoteId)->count();
+$pr->refresh();
 
-$statusAfterReject = $pr->fresh()->status->value;
+ok($quote->status->value === 'rejected', 'Quote status rejected');
+ok($quote->rejection_reason === 'Valor acima do orçamento previsto', 'rejection_reason registado');
+ok($pr->status === ProjectRequestStatus::QuoteRejected, 'Pedido em quote_rejected');
+ok(
+    Project::withoutGlobalScopes()->where('project_request_id', $pr->id)->count() === 0,
+    'Sem projecto criado'
+);
+ok(
+    DB::table('email_dispatches')->where('event_type', 'quote_accepted')
+        ->where('related_entity_id', (string) $quoteId)->count() === 0,
+    'Sem email quote_accepted'
+);
+ok(
+    DB::table('email_dispatches')->where('event_type', 'quote_rejected')
+        ->where('related_entity_id', (string) $quoteId)->exists(),
+    'email quote_rejected para gestor'
+);
+ok(
+    DB::table('email_dispatches')->where('event_type', 'quote_rejected')->count() > $emailsBefore,
+    'Nova entrada quote_rejected na BD'
+);
 
 $second = Http::acceptJson()->withToken($gestor)->post("{$api}/v1/manager/project-requests/{$pr->id}/quotes", [
     'total_amount_mt' => 45000,
     'delivery_days' => 25,
 ]);
+ok($second->status() === 201, 'Gestor envia 2.º orçamento após recusa');
+ok($pr->fresh()->status === ProjectRequestStatus::Quoted, 'Pedido transita para quoted');
 
-echo json_encode([
-    'quote_status' => $quote->status->value,
-    'rejection_reason' => $quote->rejection_reason,
-    'request_status_after_reject' => $statusAfterReject,
-    'project_created' => $projectCount === 0,
-    'quote_accepted_email' => $acceptedEmail === 0,
-    'second_quote_http' => $second->status(),
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+echo "\nOK Bloco 3A reject flow\n";

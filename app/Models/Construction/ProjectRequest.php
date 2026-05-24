@@ -7,6 +7,7 @@ namespace App\Models\Construction;
  *
  * Transições:
  * draft → submitted → under_review → quoted → approved → converted_to_project
+ * quoted → quote_rejected (orçamento recusado; gestor pode reenviar) → quoted
  * quoted → rejected | submitted → cancelled
  */
 use App\Enums\ProjectRequestStatus;

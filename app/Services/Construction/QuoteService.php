@@ -8,6 +8,7 @@ use App\Enums\ProjectRequestStatus;
 use App\Enums\QuoteStatus;
 use App\Enums\QuoteType;
 use App\Mail\QuoteAcceptedMail;
+use App\Mail\QuoteRejectedMail;
 use App\Models\Construction\ProjectRequest;
 use App\Models\Construction\ProjectTemplate;
 use App\Models\Construction\Quote;
@@ -61,6 +62,7 @@ class QuoteService
             ProjectRequestStatus::Submitted,
             ProjectRequestStatus::UnderReview,
             ProjectRequestStatus::Quoted,
+            ProjectRequestStatus::QuoteRejected,
         ];
 
         if (! in_array($request->status, $allowed, true)) {
@@ -129,7 +131,7 @@ class QuoteService
             }
             $request->update(['status' => ProjectRequestStatus::Closed]);
         } else {
-            $request->update(['status' => ProjectRequestStatus::UnderReview]);
+            $request->update(['status' => ProjectRequestStatus::QuoteRejected]);
         }
 
         $this->notifications->notify($quote->createdBy, NotificationTypes::QUOTE_REJECTED, [
@@ -138,6 +140,16 @@ class QuoteService
             'reference_type' => Quote::class,
             'reference_id' => $quote->id,
         ]);
+
+        if ($quoteType === QuoteType::Architecture && $quote->createdBy) {
+            $this->emails->dispatchIdempotent(
+                'quote_rejected',
+                $quote->createdBy,
+                new QuoteRejectedMail($quote->fresh(['projectRequest.user'])),
+                Quote::class,
+                $quote->id,
+            );
+        }
 
         return $quote->fresh();
     }

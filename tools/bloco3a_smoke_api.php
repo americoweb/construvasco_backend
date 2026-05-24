@@ -80,6 +80,12 @@ $http()->post("{$api}/v1/manager/project-requests/6/quotes", [
 $sentAfterDup = Quote::where('project_request_id', 6)->where('status', 'sent')->count();
 ok($sentAfterDup === 1, 'Segundo quote sent bloqueado (só 1 sent na BD)');
 
+$emailsAcceptedBefore = DB::table('email_dispatches')
+    ->where('event_type', 'quote_accepted')
+    ->where('related_entity_id', (string) $quoteId)
+    ->count();
+ok($emailsAcceptedBefore === 0, 'Sem quote_accepted antes do accept');
+
 $accept = Http::acceptJson()->withToken($clienteToken)->post("{$api}/v1/customer/quotes/{$quoteId}/accept");
 ok($accept->successful(), 'POST accept quote');
 
@@ -87,10 +93,11 @@ $quote = Quote::find($quoteId);
 $project = Project::withoutGlobalScopes()->where('project_request_id', 6)->first();
 ok($quote->status->value === 'accepted', 'Quote status accepted');
 ok($project && ($project->contract_phase->value ?? $project->contract_phase) === 'architecture', 'Project architecture phase');
-ok(
-    DB::table('email_dispatches')->where('event_type', 'quote_accepted')
-        ->where('related_entity_id', (string) $quoteId)->exists(),
-    'email quote_accepted'
-);
+
+$emailsAcceptedAfter = DB::table('email_dispatches')
+    ->where('event_type', 'quote_accepted')
+    ->where('related_entity_id', (string) $quoteId)
+    ->count();
+ok($emailsAcceptedAfter === 1, 'email quote_accepted criado uma vez');
 
 echo "\nOK Bloco 3A API smoke\n";

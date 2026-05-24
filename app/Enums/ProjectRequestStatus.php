@@ -8,6 +8,7 @@ enum ProjectRequestStatus: string
     case Submitted = 'submitted';
     case UnderReview = 'under_review';
     case Quoted = 'quoted';
+    case QuoteRejected = 'quote_rejected';
     case Approved = 'approved';
     case Rejected = 'rejected';
     case Cancelled = 'cancelled';
