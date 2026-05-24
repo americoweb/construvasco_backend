@@ -1,8 +1,12 @@
 @extends('emails.layout')
 @section('title', 'Comprovativo recebido')
 @section('content')
-    <h1>Comprovativo de pagamento</h1>
-    <p>Foi submetido um comprovativo de pagamento para revisão.</p>
+    @php
+        $isConstruction = ($payment->phase?->value ?? $payment->phase) === 'construction';
+        $phaseLabel = $isConstruction ? 'obra' : 'arquitectura';
+    @endphp
+    <h1>Comprovativo de pagamento de {{ $phaseLabel }}</h1>
+    <p>Foi submetido um comprovativo de pagamento de <strong>{{ $phaseLabel }}</strong> para revisão.</p>
     <p>Referência: <strong>{{ $payment->reference }}</strong></p>
     @if($payment->project)
         <p>Projecto: <strong>{{ $payment->project->name }}</strong></p>

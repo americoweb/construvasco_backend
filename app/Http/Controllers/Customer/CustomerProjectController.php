@@ -11,6 +11,7 @@ use App\Http\Resources\ProjectPaymentResource;
 use App\Models\Construction\ProjectPayment;
 use App\Models\Construction\ProjectDeliverable;
 use App\Models\Project;
+use App\Services\Construction\ConstructionFlowService;
 use App\Services\Construction\DeliverableService;
 use App\Services\Construction\PaymentService;
 use App\Services\Storage\FileStorageService;
@@ -25,6 +26,7 @@ class CustomerProjectController extends Controller
     public function __construct(
         private DeliverableService $deliverables,
         private PaymentService $payments,
+        private ConstructionFlowService $construction,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -82,9 +84,7 @@ class CustomerProjectController extends Controller
         ]);
 
         $project = Project::where('client_user_id', $request->user()->id)->findOrFail($id);
-        $payment = ProjectPayment::where('project_id', $project->id)
-            ->where('phase', ProjectPaymentPhase::Architecture)
-            ->findOrFail($paymentId);
+        $payment = ProjectPayment::where('project_id', $project->id)->findOrFail($paymentId);
 
         $payment = $this->payments->uploadProof(
             $project,
@@ -95,6 +95,26 @@ class CustomerProjectController extends Controller
         );
 
         return response()->json(['data' => new ProjectPaymentResource($payment)], 201);
+    }
+
+    public function requestConstructionQuote(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'suggested_visit_date' => 'nullable|date|after_or_equal:today',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $project = Project::where('client_user_id', $request->user()->id)->findOrFail($id);
+        $project = $this->construction->requestConstructionQuote(
+            $project,
+            $request->user(),
+            $validated['suggested_visit_date'] ?? null,
+            $validated['notes'] ?? null,
+        );
+
+        $project = $this->projectWithBriefing($project->id);
+
+        return response()->json(['data' => $this->projectPayload($project)], 201);
     }
 
     public function downloadDeliverable(

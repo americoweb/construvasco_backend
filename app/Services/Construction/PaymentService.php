@@ -58,10 +58,41 @@ class PaymentService
         return $payment;
     }
 
+    public function createConstructionPayment(Project $project, User $customer, float $amount): ProjectPayment
+    {
+        $payment = ProjectPayment::create([
+            'project_id' => $project->id,
+            'user_id' => $customer->id,
+            'type' => ProjectPaymentType::Construction,
+            'phase' => ProjectPaymentPhase::Construction,
+            'provider' => 'manual',
+            'reference' => 'CONST-' . $project->id . '-' . Str::upper(Str::random(8)),
+            'amount' => $amount,
+            'currency' => 'MZN',
+            'status' => ProjectPaymentStatus::Pending,
+        ]);
+
+        activity('payments')
+            ->performedOn($payment)
+            ->causedBy($customer)
+            ->withProperties(['amount' => $amount])
+            ->log('Pagamento de obra criado, valor ' . number_format($amount, 2, ',', '.') . ' MT, estado pendente');
+
+        return $payment;
+    }
+
     public function architecturePaymentForProject(Project $project): ?ProjectPayment
     {
         return ProjectPayment::where('project_id', $project->id)
             ->where('phase', ProjectPaymentPhase::Architecture)
+            ->latest('id')
+            ->first();
+    }
+
+    public function constructionPaymentForProject(Project $project): ?ProjectPayment
+    {
+        return ProjectPayment::where('project_id', $project->id)
+            ->where('phase', ProjectPaymentPhase::Construction)
             ->latest('id')
             ->first();
     }
@@ -132,7 +163,7 @@ class PaymentService
         activity('payments')
             ->performedOn($payment)
             ->causedBy($manager)
-            ->log('Gestor confirmou pagamento de arquitectura');
+            ->log('Gestor confirmou pagamento de ' . $this->phaseLabel($payment));
 
         $payment->load(['project', 'user']);
         if ($payment->user) {
@@ -187,16 +218,13 @@ class PaymentService
     {
         return ProjectPayment::with(['project.client', 'user'])
             ->where('status', ProjectPaymentStatus::ProofSubmitted)
-            ->where('phase', ProjectPaymentPhase::Architecture)
             ->latest('proof_uploaded_at')
             ->get();
     }
 
     public function pendingCount(): int
     {
-        return ProjectPayment::where('status', ProjectPaymentStatus::ProofSubmitted)
-            ->where('phase', ProjectPaymentPhase::Architecture)
-            ->count();
+        return ProjectPayment::where('status', ProjectPaymentStatus::ProofSubmitted)->count();
     }
 
     private function mergeNotes(?string $existing, ?string $incoming): ?string
@@ -210,6 +238,16 @@ class PaymentService
         }
 
         return $existing . "\n---\n" . $incoming;
+    }
+
+    private function phaseLabel(ProjectPayment $payment): string
+    {
+        $phase = $payment->phase;
+        if ($phase instanceof \BackedEnum) {
+            $phase = $phase->value;
+        }
+
+        return $phase === ProjectPaymentPhase::Construction->value ? 'obra' : 'arquitectura';
     }
 
     private function assertStatus(ProjectPayment $payment, array $allowed): void

@@ -11,6 +11,7 @@ use App\Models\Construction\ProjectAssignment;
 use App\Models\Construction\ProjectDeliverable;
 use App\Models\Construction\ProjectMilestone;
 use App\Models\Project;
+use App\Services\Construction\ConstructionFlowService;
 use App\Services\Construction\DeliverableService;
 use App\Services\Construction\ProjectFlowService;
 use App\Services\Notifications\NotificationService;
@@ -26,6 +27,7 @@ class ManagerProjectController extends Controller
         private ProjectFlowService $flow,
         private NotificationService $notifications,
         private DeliverableService $deliverables,
+        private ConstructionFlowService $construction,
         private FileStorageService $storage,
     ) {}
 
@@ -130,6 +132,15 @@ class ManagerProjectController extends Controller
         $project = $this->deliverables->markArchitectureDelivered($project, $request->user());
 
         return response()->json(['data' => $project]);
+    }
+
+    public function markConstructionCompleted(Request $request, int $id): JsonResponse
+    {
+        $project = Project::findOrFail($id);
+        $project = $this->construction->markConstructionCompleted($project, $request->user());
+        $project = $this->projectWithBriefing($project->id);
+
+        return response()->json(['data' => $this->projectPayload($project)]);
     }
 
     public function addPhase(Request $request, int $id): JsonResponse

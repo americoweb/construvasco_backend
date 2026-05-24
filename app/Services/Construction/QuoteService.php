@@ -123,8 +123,18 @@ class QuoteService
         }
 
         if ($quoteType === QuoteType::Construction) {
+            activity('quotes')
+                ->performedOn($quote)
+                ->causedBy($customer)
+                ->withProperties(['rejection_reason' => $reason])
+                ->log('Orçamento de obra recusado pelo cliente');
             $project = Project::withoutGlobalScopes()
                 ->where('project_request_id', $request->id)
+                ->whereIn('contract_phase', [
+                    ProjectContractPhase::ExecutionQuote,
+                    ProjectContractPhase::Construction,
+                ])
+                ->latest('id')
                 ->first();
 
             if ($project) {
@@ -142,7 +152,7 @@ class QuoteService
             'reference_id' => $quote->id,
         ]);
 
-        if ($quoteType === QuoteType::Architecture && $quote->createdBy) {
+        if ($quote->createdBy) {
             $this->emails->dispatchIdempotent(
                 'quote_rejected',
                 $quote->createdBy,
@@ -230,17 +240,13 @@ class QuoteService
     {
         $project = Project::withoutGlobalScopes()
             ->where('project_request_id', $request->id)
+            ->where('contract_phase', ProjectContractPhase::ExecutionQuote)
+            ->latest('id')
             ->first();
 
         if (! $project) {
             throw ValidationException::withMessages([
-                'quote' => ['Não existe projecto associado a este pedido.'],
-            ]);
-        }
-
-        if ($project->contract_phase !== ProjectContractPhase::ExecutionQuote) {
-            throw ValidationException::withMessages([
-                'quote' => ['O projecto deve estar na fase de orçamento de obra para aceitar este orçamento.'],
+                'quote' => ['Não existe projecto em fase de orçamento de obra para este pedido.'],
             ]);
         }
 
@@ -255,6 +261,11 @@ class QuoteService
             'responded_at' => now(),
         ]);
 
+        activity('quotes')
+            ->performedOn($quote)
+            ->causedBy($customer)
+            ->log('Cliente aceitou orçamento de obra, projecto avança para construção');
+
         $project->update([
             'contract_phase' => ProjectContractPhase::Construction,
             'construction_quote_id' => $quote->id,
@@ -262,6 +273,12 @@ class QuoteService
         ]);
 
         $request->update(['status' => ProjectRequestStatus::ConvertedToProject]);
+
+        $this->payments->createConstructionPayment(
+            $project,
+            $customer,
+            (float) $quote->total_amount_mt,
+        );
 
         if ($quote->createdBy) {
             $this->emails->dispatchIdempotent(

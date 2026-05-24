@@ -13,7 +13,9 @@ use App\Http\Requests\BriefingDataRules;
 use App\Models\Construction\ProjectDocument;
 use App\Models\Construction\ProjectRequest;
 use App\Models\Construction\Quote;
+use App\Models\Project;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
 use App\Services\Construction\QuoteService;
 use App\Services\Mail\EmailDispatcher;
 use App\Services\Notifications\NotificationService;
@@ -136,7 +138,20 @@ class ManagerProjectRequestController extends Controller
         $expiresAt = $validated['valid_until'] ?? now()->addDays(30)->toDateString();
         unset($validated['valid_until']);
 
-        $this->quotes->assertRequestAllowsQuote($item);
+        if ($quoteType === QuoteType::Construction) {
+            $project = Project::withoutGlobalScopes()
+                ->where('project_request_id', $item->id)
+                ->where('contract_phase', \App\Enums\ProjectContractPhase::ExecutionQuote)
+                ->latest('id')
+                ->first();
+            if (! $project) {
+                throw ValidationException::withMessages([
+                    'quote_type' => ['O projecto deve estar à espera de orçamento de obra.'],
+                ]);
+            }
+        } else {
+            $this->quotes->assertRequestAllowsQuote($item);
+        }
         $this->quotes->assertCanCreateQuote($item, $quoteType);
 
         $quote = Quote::create(array_merge($validated, [
@@ -158,7 +173,9 @@ class ManagerProjectRequestController extends Controller
                 'total_amount_mt' => $quote->total_amount_mt,
                 'delivery_days' => $quote->delivery_days,
             ])
-            ->log('Orçamento de arquitectura enviado ao cliente');
+            ->log($quoteType === QuoteType::Construction
+                ? 'Gestor enviou orçamento de obra ao cliente'
+                : 'Orçamento de arquitectura enviado ao cliente');
 
         $this->notifications->notify($item->user, NotificationTypes::QUOTE_RECEIVED, [
             'title' => 'Orçamento disponível',

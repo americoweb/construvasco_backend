@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProjectContractPhase;
+use App\Support\ProjectContractPhaseLabel;
 use App\Models\Construction\ProjectAssignment;
 use App\Models\Construction\ProjectDeliverable;
 use App\Models\Construction\ProjectInvoice;
@@ -26,14 +27,21 @@ class Project extends Model
     protected $fillable = [
         'tenant_id', 'client_user_id', 'project_request_id', 'quote_id', 'construction_quote_id',
         'project_template_id', 'service_category_id', 'construction_service_id', 'name', 'description',
-        'status', 'contract_phase', 'architecture_completed_at', 'suggested_site_visit_date',
+        'status', 'contract_phase', 'architecture_completed_at', 'construction_completed_at',
+        'construction_quote_requested_at', 'construction_request_notes', 'suggested_site_visit_date',
         'project_type', 'location', 'start_date', 'end_date', 'desired_deadline',
         'budget', 'target_budget', 'current_phase', 'client_can_download', 'final_payment_status',
+    ];
+
+    protected $appends = [
+        'contract_phase_label',
     ];
 
     protected $casts = [
         'contract_phase' => ProjectContractPhase::class,
         'architecture_completed_at' => 'datetime',
+        'construction_completed_at' => 'datetime',
+        'construction_quote_requested_at' => 'datetime',
         'suggested_site_visit_date' => 'date',
         'start_date' => 'date',
         'end_date' => 'date',
@@ -50,6 +58,11 @@ class Project extends Model
         'name', 'description', 'status', 'budget', 'contract_phase', 'architecture_completed_at',
     ];
     protected static $logOnlyDirty = true;
+
+    public function getContractPhaseLabelAttribute(): string
+    {
+        return ProjectContractPhaseLabel::for($this->contract_phase);
+    }
 
     public function client(): BelongsTo
     {

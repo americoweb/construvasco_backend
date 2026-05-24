@@ -31,7 +31,7 @@ class ManagerPaymentController extends Controller
     public function confirm(Request $request, int $projectId, int $paymentId): JsonResponse
     {
         $project = Project::findOrFail($projectId);
-        $payment = $this->findArchitecturePayment($project, $paymentId);
+        $payment = $this->findPayment($project, $paymentId);
         $payment = $this->payments->confirm($project, $payment, $request->user());
 
         return response()->json(['data' => new ProjectPaymentResource($payment)]);
@@ -44,7 +44,7 @@ class ManagerPaymentController extends Controller
         ]);
 
         $project = Project::findOrFail($projectId);
-        $payment = $this->findArchitecturePayment($project, $paymentId);
+        $payment = $this->findPayment($project, $paymentId);
         $payment = $this->payments->reject(
             $project,
             $payment,
@@ -58,7 +58,7 @@ class ManagerPaymentController extends Controller
     public function downloadProof(int $projectId, int $paymentId)
     {
         $project = Project::findOrFail($projectId);
-        $payment = $this->findArchitecturePayment($project, $paymentId);
+        $payment = $this->findPayment($project, $paymentId);
         abort_unless($payment->proof_path, 404, 'Comprovativo não encontrado.');
 
         return $this->storage->streamDownload(
@@ -68,10 +68,8 @@ class ManagerPaymentController extends Controller
         );
     }
 
-    private function findArchitecturePayment(Project $project, int $paymentId): ProjectPayment
+    private function findPayment(Project $project, int $paymentId): ProjectPayment
     {
-        return ProjectPayment::where('project_id', $project->id)
-            ->where('phase', ProjectPaymentPhase::Architecture)
-            ->findOrFail($paymentId);
+        return ProjectPayment::where('project_id', $project->id)->findOrFail($paymentId);
     }
 }
