@@ -1,0 +1,8 @@
+﻿Verificacao pos migrate:fresh + db:seed (2026-05-24 13:59)
+
+Lista /conta/pedidos (cliente@construvasco.co.mz):
+- DEMO-PED-STUDIO (id 1) - mockup aprovado demo-fachada-1.png - HTTP 200
+- DEMO-PED-GERADO (id 2) - mockup aprovado demo-fachada-2.png - HTTP 200
+
+Ficheiros em storage/app/public/renders/demo/: demo-fachada-1..4.png
+Imagens: Unsplash (uso demo local)

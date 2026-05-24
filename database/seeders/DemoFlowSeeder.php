@@ -19,10 +19,18 @@ use App\Services\Credits\CreditService;
 use Illuminate\Database\Seeder;
 
 /**
- * Dados demo Bloco 1: estúdio + arquitectura + projecto activo (sem fase obra).
+ * Dados demo: estúdio com mockups estáticos, pedidos em vários estados, projecto activo.
  */
 class DemoFlowSeeder extends Seeder
 {
+    /** @var list<string> */
+    private const DEMO_FACADE_FILES = [
+        'demo-fachada-1.png',
+        'demo-fachada-2.png',
+        'demo-fachada-3.png',
+        'demo-fachada-4.png',
+    ];
+
     public function run(): void
     {
         if (! session('tenant_id')) {
@@ -46,7 +54,7 @@ class DemoFlowSeeder extends Seeder
                 'project_type' => 'residencial',
                 'tipologia' => 't4',
                 'title' => 'Moradia T4 — Estúdio demo',
-                'description' => 'Pedido submetido com mockup aprovado para testes do estúdio.',
+                'description' => 'Pedido submetido com mockup aprovado para demonstração do estúdio.',
                 'localizacao' => 'Maputo, Moçambique',
                 'area_m2' => 220,
                 'num_pisos' => 2,
@@ -60,23 +68,33 @@ class DemoFlowSeeder extends Seeder
             ]
         );
 
-        $mockup = AiGeneration::firstOrCreate(
+        $this->seedDemoFacadeGallery($studioRequest, $cliente, approvedIndex: 1);
+
+        $generatedRequest = ProjectRequest::firstOrCreate(
+            ['reference_code' => 'DEMO-PED-GERADO'],
             [
-                'project_request_id' => $studioRequest->id,
                 'user_id' => $cliente->id,
-                'type' => AiGenerationType::FacadeRender,
-            ],
-            [
-                'prompt' => 'Render de fachada — demo Bloco 1',
-                'status' => AiGenerationStatus::Completed,
-                'image_path' => 'renders/demo_mockup.png',
-                'image_url' => '/storage/renders/demo_mockup.png',
-                'credits_consumed' => 0,
-                'provider' => 'gemini',
+                'project_type' => 'residencial',
+                'tipologia' => 't3',
+                'title' => 'Moradia T3 — Mockups gerados (demo)',
+                'description' => 'Pedido recente com galeria de fachadas geradas para demonstração.',
+                'localizacao' => 'Maputo, Moçambique',
+                'area_m2' => 150,
+                'num_pisos' => 2,
+                'status' => ProjectRequestStatus::Submitted,
+                'submitted_at' => now()->subHours(6),
+                'briefing_data' => [
+                    'estilo_arquitectonico' => 'moderno',
+                    'paleta_acabamento' => 'branco, cinza e madeira clara',
+                    'programa' => 'sala, cozinha, 3 quartos, varanda',
+                    'area_m2' => 150,
+                    'num_pisos' => 2,
+                    'localizacao' => 'Maputo, Moçambique',
+                ],
             ]
         );
 
-        $studioRequest->update(['approved_ai_generation_id' => $mockup->id]);
+        $this->seedDemoFacadeGallery($generatedRequest, $cliente, approvedIndex: 2);
 
         $pending = ProjectRequest::firstOrCreate(
             ['reference_code' => 'DEMO-PED-001'],
@@ -175,5 +193,55 @@ class DemoFlowSeeder extends Seeder
                 'contract_phase' => ProjectContractPhase::Architecture,
             ]);
         }
+    }
+
+    /**
+     * Galeria de fachadas demo: uma aprovada (completed), restantes superseded.
+     */
+    private function seedDemoFacadeGallery(
+        ProjectRequest $request,
+        User $cliente,
+        int $approvedIndex = 1,
+    ): void {
+        AiGeneration::where('project_request_id', $request->id)->delete();
+
+        $approvedGen = null;
+
+        foreach (self::DEMO_FACADE_FILES as $index => $filename) {
+            $slot = $index + 1;
+            $paths = $this->demoImagePaths($filename);
+            $isApproved = $slot === $approvedIndex;
+
+            $gen = AiGeneration::create([
+                'project_request_id' => $request->id,
+                'user_id' => $cliente->id,
+                'type' => AiGenerationType::FacadeRender,
+                'prompt' => "Render de fachada demo {$slot} — Moradia Maputo",
+                'status' => $isApproved ? AiGenerationStatus::Completed : AiGenerationStatus::Superseded,
+                'image_path' => $paths['image_path'],
+                'image_url' => $paths['image_url'],
+                'credits_consumed' => 0,
+                'provider' => 'demo',
+            ]);
+
+            if ($isApproved) {
+                $approvedGen = $gen;
+            }
+        }
+
+        if ($approvedGen) {
+            $request->update(['approved_ai_generation_id' => $approvedGen->id]);
+        }
+    }
+
+    /** @return array{image_path: string, image_url: string} */
+    private function demoImagePaths(string $filename): array
+    {
+        $path = 'renders/demo/' . $filename;
+
+        return [
+            'image_path' => $path,
+            'image_url' => '/storage/' . $path,
+        ];
     }
 }
